@@ -5,5 +5,6 @@ template_name = '../../data/testing/zapsplat_1.wav';
 
 test_name = '../../data/testing/audioset_3.wav';
 [test,Fs] = audioread(test_name);
-stem(test(:,1))
-soundsc(test,Fs)
+% stem(test(:,1))
+% soundsc(test,Fs)
+
