@@ -9,7 +9,7 @@ augmenter = audioDataAugmenter(...
     "AugmentationParameterSource","random",...
     "NumAugmentations",200, ...
     ...
-    "TimeStretchProbability",0.7, ...
+    "TimeStretchProbability",0.8, ...
     "SpeedupFactorRange", [0.6,1.7], ...
     ...
     "PitchShiftProbability",0, ...
@@ -18,13 +18,21 @@ augmenter = audioDataAugmenter(...
     "VolumeGainRange",[0,10], ... % in dB
     ...
     "AddNoiseProbability",0.4, ...
-    "SNRRange",[0,1], ...
+    "SNRRange",[10,20], ...
     ...
     "TimeShiftProbability",0);
+
+% turn warning for audio clipping off
+
+warning('off','MATLAB:audiovideo:audiowrite:dataClipped')
 
 % start at 3 to skip '.' and '..' files
 
 for i = 3:length(files)
+    
+    % progress update
+    
+    fprintf('Augmenting %s... (%d/%d)\n',files(i).name,i-2,length(files)-2);
     
     % create absolute filename
     
@@ -44,18 +52,8 @@ for i = 3:length(files)
         audio_file = x_aug.Audio{j};
         idx = strcat('_',int2str(j),'.wav');
         new_filename = strrep(files(i).name,'.wav',idx);
-        audiowrite(new_filename,audio_file,Fs);
+        new_full_filename = fullfile(files(i).folder,new_filename);
+        audiowrite(new_full_filename,audio_file,Fs);
     end
     
 end
-
-% augment audio
-
-% x_aug = augment(augmenter,x,Fs);
-
-% for i = 1:height(x_aug)
-%     disp(x_aug.AugmentationInfo(i))
-% end
-% for i=1:height(x_aug)
-%     audiowrite('.../test/zapsplate_1')
-% end
