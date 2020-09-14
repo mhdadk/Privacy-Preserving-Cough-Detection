@@ -1,10 +1,14 @@
 % get list of audio files
 
-files = dir('../../data/data_audio/0_not_cough');
+files = dir('../../data/cough_clean');
 
 % new sampling rate
 
 Fs_new = 16000;
+
+% turn warning for audio clipping off
+
+warning('off','MATLAB:audiovideo:audiowrite:dataClipped')
 
 % iterate through files
 
@@ -32,7 +36,7 @@ for i = 3:length(files)
     
     % save downsampled audio file
     
-    dst = strcat('../../data/data_audio/not_cough_16kHz/',files(i).name);
+    dst = strcat('../../data/cough_clean_16kHz/',files(i).name);
     audiowrite(dst,x_new,Fs_new)
     
 end
