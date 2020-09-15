@@ -40,9 +40,14 @@ def time_warp(mel_spec,W=30,show_result=False):
     
     mel_spec_height, tau = mel_spec.shape
     
+    # initialize random number generator
+    
+    rng = np.random.default_rng()
+    
     # alpha is the column to be warped
     
-    alpha = np.random.randint(W,tau - W)
+    alpha = rng.integers(W,tau - W,
+                         endpoint = True)
 
     # each row of this array will contain the locations of the points to be
     # warped. More precisely, it contains the coordinates of the alpha column,
@@ -65,7 +70,8 @@ def time_warp(mel_spec,W=30,show_result=False):
     
     # sample w from a discrete uniform distribution
     
-    w = np.random.randint(-W,W)
+    w = rng.integers(-W,W,
+                     endpoint = True)
 
     # each row of this array will contain the locations of the destinations that
     # the points in src_ctrl_pt_loc will be warped to. These coordinates
@@ -142,7 +148,8 @@ def time_warp(mel_spec,W=30,show_result=False):
         
         # convert to dB
         
-        warped_spec2 = librosa.power_to_db(warped_spec[0,:,:,0],ref=np.max)
+        warped_spec2 = librosa.power_to_db(warped_spec[0,:,:,0],
+                                           ref = np.max)
         
         # plot vertical line to show warping
         
