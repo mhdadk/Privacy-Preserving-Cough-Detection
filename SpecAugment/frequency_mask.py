@@ -50,7 +50,7 @@ if __name__ == '__main__':
     
     mel_spec2 = frequency_mask(mel_spec,
                                F = 30,
-                               num_masks = 2)
+                               num_masks = 5)
     
     # original spectrogram
     
