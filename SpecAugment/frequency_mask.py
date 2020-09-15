@@ -1,7 +1,4 @@
 import numpy as np
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
 
 def frequency_mask(mel_spectrogram, F = 30, num_masks = 1):
     
@@ -12,7 +9,7 @@ def frequency_mask(mel_spectrogram, F = 30, num_masks = 1):
     
     # number of Mels in spectrogram
     
-    num_mels = mel_spec.shape[0]
+    v = mel_spec.shape[0]
     
     # initialize random number generator
         
@@ -23,16 +20,20 @@ def frequency_mask(mel_spectrogram, F = 30, num_masks = 1):
     for _ in range(0,num_masks):
         
         f = rng.integers(0,F,
-                          endpoint = True)
+                         endpoint = True)
         
-        f_0 = rng.integers(0,num_mels - f,
-                            endpoint = True)
+        f_0 = rng.integers(0,v - f,
+                           endpoint = True)
         
         mel_spec[f_0:f_0 + f] = np.mean(mel_spec)
     
     return mel_spec
 
 if __name__ == '__main__':
+    
+    import librosa
+    import librosa.display
+    import matplotlib.pyplot as plt
     
     # load test audio file
     
