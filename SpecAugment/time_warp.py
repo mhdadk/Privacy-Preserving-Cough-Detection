@@ -1,10 +1,10 @@
 import numpy as np
 from tensorflow_addons.image import sparse_image_warp
 
-def time_warp(mel_spec,W=30,show_result=False):
+def time_warp(mel_spectrogram,W=30):
     
     """
-    Given a Mel-scale spectrogram with shape mel_spec_height x tau, time
+    Given a Mel-scale spectrogram with shape v x tau, time
     warping is done as follows:
     
     1. Pick a column on the time axis at random from column number W to column
@@ -35,10 +35,16 @@ def time_warp(mel_spec,W=30,show_result=False):
         
     """
     
-    # width and height of Mel-scale spectrogram. Height is equivalent to number
-    # of Mels and width is tau to match notation used in paper
+    # numpy arrays are mutable, so need to make copy to avoid modifying
+    # original array
     
-    mel_spec_height, tau = mel_spec.shape
+    mel_spec = mel_spectrogram.copy()
+    
+    # width and height of Mel-scale spectrogram. Height is equivalent to number
+    # of Mels and width is equivalent to number of time steps.
+    # v and tau are used to match the notation used in the original paper
+    
+    v, tau = mel_spec.shape
     
     # initialize random number generator
     
@@ -53,12 +59,11 @@ def time_warp(mel_spec,W=30,show_result=False):
     # warped. More precisely, it contains the coordinates of the alpha column,
     # such that each pixel in the alpha column has its own coordinate
 
-    src_ctrl_pt_loc = np.zeros((mel_spec_height,2),
-                               dtype=np.float32)
+    src_ctrl_pt_loc = np.zeros((v,2),dtype=np.float32)
     
     # each row of the alpha column
     
-    src_ctrl_pt_loc[:,0] = np.arange(mel_spec_height)
+    src_ctrl_pt_loc[:,0] = np.arange(v)
     
     # the alpha column
     
@@ -77,12 +82,11 @@ def time_warp(mel_spec,W=30,show_result=False):
     # the points in src_ctrl_pt_loc will be warped to. These coordinates
     # correspond to the target column
 
-    dst_ctrl_pt_loc = np.zeros((mel_spec_height,2),
-                               dtype=np.float32)
+    dst_ctrl_pt_loc = np.zeros((v,2),dtype=np.float32)
     
     # each row of the target column
     
-    dst_ctrl_pt_loc[:,0] = np.arange(mel_spec_height)
+    dst_ctrl_pt_loc[:,0] = np.arange(v)
     
     # the target column
     
@@ -106,7 +110,8 @@ def time_warp(mel_spec,W=30,show_result=False):
     method.
     
     the num_boundary_points argument is set to be greater than 0 such that
-    frequency content is not lost while warping by constraining the warping.
+    frequency content is not lost while warping by constraining the warping
+    transformation.
     """
     
     warped_spec = sparse_image_warp(
@@ -117,55 +122,11 @@ def time_warp(mel_spec,W=30,show_result=False):
                         regularization_weight = 0.0,
                         num_boundary_points = 1)[0].numpy()
     
-    # show original spectrogram and warped spectrogram
+    # remove redundant dimensions
     
-    if show_result:
-        
-        # original spectrogram
-        
-        plt.subplot(2,1,1)
-        
-        # convert to dB
-        
-        mel_spec = librosa.power_to_db(mel_spec[0,:,:,0],
-                                       ref=np.max)
-        
-        # plot vertical line showing the column that is warped
-        
-        mel_spec[:,alpha] = 0
-        
-        # display the original spectrogram
-        
-        librosa.display.specshow(mel_spec,
-                                 x_axis='time',
-                                 y_axis='mel')
-        plt.colorbar(format='%+2.0f dB')
-        plt.title('Mel spectrogram')
-        
-        # warped spectrogram
-        
-        plt.subplot(2,1,2)
-        
-        # convert to dB
-        
-        warped_spec2 = librosa.power_to_db(warped_spec[0,:,:,0],
-                                           ref = np.max)
-        
-        # plot vertical line to show warping
-        
-        warped_spec2[:,alpha + w] = 0
-        
-        # display the warped spectrogram
-        
-        librosa.display.specshow(warped_spec2,
-                                 x_axis='time',
-                                 y_axis='mel')
-        plt.colorbar(format='%+2.0f dB')
-        plt.title('Mel spectrogram')
-        
-        plt.tight_layout()
+    warped_spec = np.squeeze(warped_spec)
     
-    return warped_spec
+    return warped_spec,alpha,w
 
 if __name__ == '__main__':
     
@@ -184,6 +145,48 @@ if __name__ == '__main__':
                                               power = 2.0,
                                               n_mels = 256)
     
-    warped_spec = time_warp(mel_spec,
-                            W = 20,
-                            show_result = True)
+    warped_spec,alpha,w = time_warp(mel_spec,W=30)
+   
+    # show original spectrogram and warped spectrogram
+    
+    # original spectrogram
+        
+    plt.subplot(2,1,1)
+    
+    # convert to dB
+    
+    mel_spec = librosa.power_to_db(mel_spec,ref=np.max)
+    
+    # plot vertical line showing the column that is warped
+    
+    mel_spec[:,alpha] = 0
+    
+    # display the original spectrogram
+    
+    librosa.display.specshow(mel_spec,
+                             x_axis='time',
+                             y_axis='mel')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Mel spectrogram')
+    
+    # warped spectrogram
+    
+    plt.subplot(2,1,2)
+    
+    # convert to dB
+    
+    warped_spec = librosa.power_to_db(warped_spec,ref=np.max)
+    
+    # plot vertical line to show warping
+    
+    warped_spec[:,alpha + w] = 0
+    
+    # display the warped spectrogram
+    
+    librosa.display.specshow(warped_spec,
+                             x_axis='time',
+                             y_axis='mel')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Mel spectrogram')
+    
+    plt.tight_layout()
