@@ -262,6 +262,8 @@ class SpecAugment:
         # apply random transformations. Note that mel_spec is modified in-place
         # using these methods because it is a mutable numpy array
         
+        i=0
+        
         for _ in range(self.num_aug):
             
             # numpy arrays are mutable, so need to make copy to avoid modifying
@@ -307,33 +309,35 @@ class SpecAugment:
             if (x > self.aug_split[0] and x > self.aug_split[1] and 
                 x > self.aug_split[2]):
                 
-                x = self.rng.integers(1,3,endpoint=True)
+                continue
                 
-                if x == 1:
-                    self.time_warp(mel_spec)
-                    time_warped.append(1)
-                if x == 2:
-                    # if a random number of time masks are to be applied
+                # x = self.rng.integers(1,3,endpoint=True)
                 
-                    if self.num_masks_random:
-                        num_t_masks = self.rng.integers(1,self.num_time_masks,
-                                                        endpoint = True)
-                    else:
-                        num_t_masks = self.num_time_masks
+                # if x == 1:
+                #     self.time_warp(mel_spec)
+                #     time_warped.append(1)
+                # if x == 2:
+                #     # if a random number of time masks are to be applied
+                
+                #     if self.num_masks_random:
+                #         num_t_masks = self.rng.integers(1,self.num_time_masks,
+                #                                         endpoint = True)
+                #     else:
+                #         num_t_masks = self.num_time_masks
                     
-                    self.time_mask(mel_spec,num_t_masks)
-                    time_masked.append(1)
-                if x == 3:
-                    # if a random number of frequency masks are to be applied
+                #     self.time_mask(mel_spec,num_t_masks)
+                #     time_masked.append(1)
+                # if x == 3:
+                #     # if a random number of frequency masks are to be applied
                 
-                    if self.num_masks_random:
-                        num_f_masks = self.rng.integers(1,self.num_frequency_masks,
-                                                        endpoint = True)
-                    else:
-                        num_f_masks = self.num_frequency_masks
+                #     if self.num_masks_random:
+                #         num_f_masks = self.rng.integers(1,self.num_frequency_masks,
+                #                                         endpoint = True)
+                #     else:
+                #         num_f_masks = self.num_frequency_masks
                     
-                    self.frequency_mask(mel_spec,num_f_masks)
-                    frequency_masked.append(1)
+                #     self.frequency_mask(mel_spec,num_f_masks)
+                #     frequency_masked.append(1)
             
             # save the augmentation
             
