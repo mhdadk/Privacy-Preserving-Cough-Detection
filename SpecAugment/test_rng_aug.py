@@ -18,9 +18,13 @@ P(FM = 1). Note that:
 P(TW = 0) = 1 - P(TW = 1)
 P(TM = 0) = 1 - P(TM = 1)
 P(FM = 0) = 1 - P(FM = 1)
+
+NOTE: Because the probability of not time warping, not time masking, and not
+frequency masking a spectrogram is set to 0, then the sum of these
+probabilities MUST be at least 1.5. In other words, sum(p) > 1.5.
 """
 
-p = [0.1,0.2,0.9]
+p = [0.0,0.9,0.9]
 
 """
 The possible transformations that can be applied are shown in the table below.
@@ -88,7 +92,7 @@ rng = np.random.default_rng()
 # the joint distribution is a discrete categorical distribution
 # sample num_samples times from the categorical distribution
 
-num_samples = 1000
+num_samples = 10000
 
 x = rng.multinomial(n = 1,
                     pvals = joint, # event probabilities
