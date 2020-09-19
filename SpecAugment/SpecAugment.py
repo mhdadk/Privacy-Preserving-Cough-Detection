@@ -1,11 +1,14 @@
 import numpy as np
 from tensorflow_addons.image import sparse_image_warp
+import librosa.display
+import matplotlib.pyplot as plt
+import random
 
 class SpecAugment:
     
     def __init__(self,
                  num_aug,
-                 aug_split,
+                 p,
                  num_time_masks,
                  num_frequency_masks,
                  time_warp_param = 30,
@@ -18,42 +21,100 @@ class SpecAugment:
         self.num_aug = num_aug
         
         """
-        list of proportions of the the total number of num_aug augmentations.
+        The following list contains the proportions of the total number of augmentations
+        that are time warped (TW), time masked (TM), and frequency masked (FM). These
+        transformations are considered as random variables with associated probability
+        distributions P(TW), P(TM), and P(FM) respectively. These are Bernoulli random
+        variables, where each transformation can either be applied (1) or not applied
+        (0).
         
-        The first element of this list should indicate the proportion of num_aug
-        augmentations that should be time warped. For example, 0.4 indicates
-        that 40% of the total number of num_aug augmentations will be time
-        warped.
-        
-        The second element of this list should indicate the proportion of
-        num_aug augmentations that should be time masked. For example, 0.6
-        indicates that 60% of the total number of num_aug augmentations will
-        be time masked.
-        
-        The third element of this list should indicate the proportion of
-        num_aug augmentations that should be frequency masked. For example, 0.5
-        indicates that 50% of the total number of num_aug augmentations will
-        be frequency masked.
-        
-        Note that these proportions don't necessarily need to add up to 1. Also,
-        since these proportions are achieved through random sampling, then each
-        of their values should be at least 0.5 to avoid the case where none of
-        these augmentations are applied.
-        
-        Note that these transformations are not mutually exclusive, which means
-        that different combinations of these transformations will be applied to
-        some proportion of the total number of num_aug augmentations.
-        
-        For example, if:
+        The first element of the list corresponds to the proportion of the total number
+        of augmentations that are time warped, or P(TW = 1). The second element of the
+        list corresponds to the proportion of the total number of augmentations that are
+        time masked, or P(TM = 1). The third element of the list corresponds to the
+        proportion of the total number of augmentations that are frequency masked, or
+        P(FM = 1). For example, if:
             
-        aug_split = [0.4,0.6,0.7]
+        p = [0.4,0.6,0.7]
         
         Then this means that of the total number of num_aug augmentations,
         40% will be time warped, 60% will be time masked, and 70% will be
-        frequency masked.
+        frequency masked. Note that:
+        
+        P(TW = 0) = 1 - P(TW = 1)
+        P(TM = 0) = 1 - P(TM = 1)
+        P(FM = 0) = 1 - P(FM = 1)
+        
+        IMPORTANT NOTE: Because the probability of not time warping, not time
+        masking, and not frequency masking a spectrogram is set to 0, then the
+        sum of these probabilities MUST be at least 1.5. In other words, 
+        sum(p) > 1.5.
         """
         
-        self.aug_split = aug_split
+        self.p = p
+        
+        """
+        The possible transformations that can be applied are shown in the table below.
+        TW stands for time warping, TM stands for time masking, and FM stands for
+        frequency masking. A 1 indicates that the corresponding transformation is
+        applied, while a 0 indicates that the corresponding transformation is not
+        applied.
+        
+        TW  TM  FM
+        -----------
+        0   0   0
+        0   0   1
+        0   1   0
+        0   1   1
+        1   0   0
+        1   0   1
+        1   1   0
+        1   1   1
+        
+        Since these transformations can be applied in combinations, then a joint
+        distribution for these transformations P(TW,TM,FM) also exists. However, these
+        transformations are assumed to be independent from each other, such that the
+        occurence of one transformation does not imply anything about the occurence of
+        another transformation. This means that:
+        
+        P(TW,TM,FM) = P(TW) x P(TM) x P(FM)
+        
+        To avoid no augmentations occuring at all, which is when TW = 0 and TM = 0 and
+        FM = 0, then the joint probability of these events should be set to 0:
+            
+        P(TW = 0,TM = 0,FM = 0) = 0
+        
+        However, the probability mass associated with P(TW = 0,TM = 0,FM = 0) must now
+        be re-distributed to the rest of the probability distribution. Since there
+        are 7 outcomes in total, then the following probability mass is re-distributed:
+            
+        P(TW = 0,TM = 0,FM = 0) / 7 = P(TW = 0) x P(TM = 0) x P(FM = 0) / 7
+        
+        This is equivalent to re-distributing:
+            
+        (1 - P(TW = 1)) x (1 - P(TM = 1)) x (1 - P(FM = 1)) / 7
+        
+        Re-distribution is done by adding this probability mass to the probability mass
+        of each of the other outcomes.
+        """
+
+        self.redistribution = (1-p[0])*(1-p[1])*(1-p[2])/7
+        
+        # the joint distribution P(TW,TM,FM) = P(TW) x P(TM) x P(FM) is defined here.
+        # Note that the sum of all probability masses must be equal to 1
+
+        self.joint = [0, # P(TW = 0,TM = 0,FM = 0)
+                      (1-p[0])*(1-p[1])*( p[2] ) + self.redistribution, # P(TW = 0,TM = 0,FM = 1)
+                      (1-p[0])*( p[1] )*(1-p[2]) + self.redistribution, # P(TW = 0,TM = 1,FM = 0)
+                      (1-p[0])*( p[1] )*( p[2] ) + self.redistribution, # P(TW = 0,TM = 1,FM = 1)
+                      ( p[0] )*(1-p[1])*(1-p[2]) + self.redistribution, # P(TW = 1,TM = 0,FM = 0)
+                      ( p[0] )*(1-p[1])*( p[2] ) + self.redistribution, # P(TW = 1,TM = 0,FM = 1)
+                      ( p[0] )*( p[1] )*(1-p[2]) + self.redistribution, # P(TW = 1,TM = 1,FM = 0)
+                      ( p[0] )*( p[1] )*( p[2] ) + self.redistribution] # P(TW = 1,TM = 1,FM = 1)
+        
+        # initialize random number generator
+        
+        self.rng = np.random.default_rng()
         
         # time warping parameter W. See the time_warp() method for details
         
@@ -93,10 +154,6 @@ class SpecAugment:
         
         self.num_masks_random = num_masks_random
         
-        # initialize random number generator
-        
-        self.rng = np.random.default_rng()
-    
     def time_warp(self,mel_spec):
     
         """
@@ -213,7 +270,15 @@ class SpecAugment:
         
         mel_spec = np.squeeze(mel_spec)
     
-    def time_mask(self,mel_spec,num_masks):
+    def time_mask(self,mel_spec):
+        
+        # if a random number of time masks are to be applied
+        
+        if self.num_masks_random:
+            num_masks = self.rng.integers(1,self.num_time_masks,
+                                          endpoint = True)
+        else:
+            num_masks = self.num_time_masks
         
         # number of time steps in spectrogram
         
@@ -231,7 +296,15 @@ class SpecAugment:
             
             mel_spec[:, t_0:t_0 + t] = np.mean(mel_spec)
         
-    def frequency_mask(self,mel_spec,num_masks):
+    def frequency_mask(self,mel_spec):
+        
+        # if a random number of frequency masks are to be applied
+                
+        if self.num_masks_random:
+            num_masks = self.rng.integers(1,self.num_frequency_masks,
+                                            endpoint = True)
+        else:
+            num_masks = self.num_frequency_masks
         
         # number of Mels in spectrogram
         
@@ -254,15 +327,15 @@ class SpecAugment:
         # lists to store augmentations
         
         augmentations = []
-        # TODO: remove this
+        
+        # track type of augmentations
             
-        time_warped=[]
-        time_masked=[]
-        frequency_masked=[]
+        time_warped = 0
+        time_masked = 0
+        frequency_masked = 0
+        
         # apply random transformations. Note that mel_spec is modified in-place
         # using these methods because it is a mutable numpy array
-        
-        i=0
         
         for _ in range(self.num_aug):
             
@@ -271,85 +344,103 @@ class SpecAugment:
             
             mel_spec = mel_spectrogram.copy()
             
-            x = self.rng.uniform(low=0.0,high=1.0)
+            # sample categorical random variable from 0 - 7
             
-            if x <= self.aug_split[0]:
+            x = self.rng.multinomial(n = 1,
+                                     pvals = self.joint,
+                                     size = 1)
+            
+            x = np.nonzero(x)[1]
+            
+            if x == 1:
+                
+                self.frequency_mask(mel_spec)
+                frequency_masked += 1
+            
+            if x == 2:
+                
+                self.time_mask(mel_spec)
+                time_masked += 1
+            
+            if x == 3:
+                
+                self.time_mask(mel_spec)
+                self.frequency_mask(mel_spec)
+                time_masked += 1
+                frequency_masked += 1
+            
+            if x == 4:
                 
                 self.time_warp(mel_spec)
-                time_warped.append(1)
+                time_warped += 1
+                
+            if x == 5:
+                
+                self.time_warp(mel_spec)
+                self.frequency_mask(mel_spec)
+                time_warped += 1
+                frequency_masked += 1
             
-            if x <= self.aug_split[1]:
+            if x == 6:
                 
-                # if a random number of time masks are to be applied
-                
-                if self.num_masks_random:
-                    num_t_masks = self.rng.integers(1,self.num_time_masks,
-                                                    endpoint = True)
-                else:
-                    num_t_masks = self.num_time_masks
-                
-                self.time_mask(mel_spec,num_t_masks)
-                time_masked.append(1)
+                self.time_warp(mel_spec)
+                self.time_mask(mel_spec)
+                time_warped += 1
+                time_masked += 1
             
-            if x <= self.aug_split[2]:
+            if x == 7:
                 
-                # if a random number of frequency masks are to be applied
-                
-                if self.num_masks_random:
-                    num_f_masks = self.rng.integers(1,self.num_frequency_masks,
-                                                    endpoint = True)
-                else:
-                    num_f_masks = self.num_frequency_masks
-                
-                self.frequency_mask(mel_spec,num_f_masks)
-                frequency_masked.append(1)
-            
-            # TODO: remove this
-            
-            if (x > self.aug_split[0] and x > self.aug_split[1] and 
-                x > self.aug_split[2]):
-                
-                continue
-                
-                # x = self.rng.integers(1,3,endpoint=True)
-                
-                # if x == 1:
-                #     self.time_warp(mel_spec)
-                #     time_warped.append(1)
-                # if x == 2:
-                #     # if a random number of time masks are to be applied
-                
-                #     if self.num_masks_random:
-                #         num_t_masks = self.rng.integers(1,self.num_time_masks,
-                #                                         endpoint = True)
-                #     else:
-                #         num_t_masks = self.num_time_masks
-                    
-                #     self.time_mask(mel_spec,num_t_masks)
-                #     time_masked.append(1)
-                # if x == 3:
-                #     # if a random number of frequency masks are to be applied
-                
-                #     if self.num_masks_random:
-                #         num_f_masks = self.rng.integers(1,self.num_frequency_masks,
-                #                                         endpoint = True)
-                #     else:
-                #         num_f_masks = self.num_frequency_masks
-                    
-                #     self.frequency_mask(mel_spec,num_f_masks)
-                #     frequency_masked.append(1)
+                self.time_warp(mel_spec)
+                self.time_mask(mel_spec)
+                self.frequency_mask(mel_spec)
+                time_warped += 1
+                time_masked += 1
+                frequency_masked += 1
             
             # save the augmentation
             
             augmentations.append(mel_spec)
-            
-        return augmentations,time_warped,time_masked,frequency_masked
+        
+        proportions = [time_warped/self.num_aug,
+                       time_masked/self.num_aug,
+                       frequency_masked/self.num_aug]
+        
+        return augmentations,proportions
+    
+    def show_augmentation(self,mel_spec,augmentations):
+        
+        aug = random.choice(augmentations)
+        
+        # original spectrogram
+    
+        plt.subplot(2,1,1)
+        
+        # display the original spectrogram
+        
+        librosa.display.specshow(log_mel_spec,
+                                 x_axis='time',
+                                 y_axis='mel')
+        plt.colorbar(format='%+2.0f dB')
+        plt.title('Mel spectrogram')
+        
+        # masked spectrogram
+        
+        plt.subplot(2,1,2)
+        
+        # display the masked spectrogram
+        
+        librosa.display.specshow(aug,
+                                 x_axis='time',
+                                 y_axis='mel')
+        plt.colorbar(format='%+2.0f dB')
+        plt.title('Mel spectrogram')
+        
+        plt.tight_layout()
+        
 
 if __name__ == '__main__':
     
     import librosa
-    import librosa.display
-    import matplotlib.pyplot as plt
     
     x,sr = librosa.load(path = 'test.wav',
                         sr = None,
@@ -362,14 +453,17 @@ if __name__ == '__main__':
                                               power = 2.0,
                                               n_mels = 256)
     
-    spec_augment = SpecAugment(num_aug = 200,
-                               aug_split = [0.1,0.7,0.4],
+    log_mel_spec = mel_spec = librosa.power_to_db(mel_spec,
+                                                  ref = np.max)
+    
+    spec_augment = SpecAugment(num_aug = 100,
+                               p = [0.9,0.5,0.5],
                                time_warp_param = 30,
-                               time_mask_param = 30,
-                               frequency_mask_param = 30,
+                               time_mask_param = 20,
+                               frequency_mask_param = 20,
                                num_time_masks = 2,
                                num_frequency_masks = 3,
                                num_masks_random = True)
     
-    augmentations,time_warped,time_masked,frequency_masked = spec_augment(mel_spec)
+    augmentations,proportions = spec_augment(log_mel_spec)
             
