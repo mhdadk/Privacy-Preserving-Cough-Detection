@@ -154,7 +154,7 @@ class SpecAugment:
         
         self.num_masks_random = num_masks_random
         
-    def time_warp(self,mel_spec):
+    def time_warp(self,log_mel_spec):
     
         """
         Given a Mel-scale spectrogram with shape v x tau, time
@@ -188,11 +188,16 @@ class SpecAugment:
             
         """
         
+        # numpy arrays are mutable, so need to make copy to avoid modifying
+        # original array
+            
+        y = log_mel_spec.copy()
+        
         # width and height of Mel-scale spectrogram. Height is equivalent to number
         # of Mels and width is equivalent to number of time steps.
         # v and tau are used to match the notation used in the original paper
         
-        v, tau = mel_spec.shape
+        v, tau = y.shape
         
         # alpha is the column to be warped
         
@@ -220,7 +225,7 @@ class SpecAugment:
         # sample w from a discrete uniform distribution
         
         w = self.rng.integers(-self.W,self.W,
-                         endpoint = True)
+                              endpoint = True)
     
         # each row of this array will contain the locations of the destinations that
         # the points in src_ctrl_pt_loc will be warped to. These coordinates
@@ -243,7 +248,7 @@ class SpecAugment:
         # add batch and channel dimensions for the sparse_image_warp function to be
         # used later
     
-        mel_spec = np.reshape(mel_spec,(1,*mel_spec.shape,1))
+        y = np.reshape(y,(1,*y.shape,1))
         
         """    
         the sparse_image_warp function returns a tuple, where the first element
@@ -258,19 +263,25 @@ class SpecAugment:
         transformation.
         """
         
-        mel_spec = sparse_image_warp(
-                            image = mel_spec,
-                            source_control_point_locations = src_ctrl_pt_loc,
-                            dest_control_point_locations = dst_ctrl_pt_loc,
-                            interpolation_order = 2,
-                            regularization_weight = 0.0,
-                            num_boundary_points = 1)[0].numpy()
+        y = sparse_image_warp(image = y,
+                              source_control_point_locations = src_ctrl_pt_loc,
+                              dest_control_point_locations = dst_ctrl_pt_loc,
+                              interpolation_order = 2,
+                              regularization_weight = 0.0,
+                              num_boundary_points = 1)[0].numpy()
         
         # remove redundant dimensions
         
-        mel_spec = np.squeeze(mel_spec)
+        y = np.squeeze(y)
+        
+        return y
     
-    def time_mask(self,mel_spec):
+    def time_mask(self,log_mel_spec):
+        
+        # numpy arrays are mutable, so need to make copy to avoid modifying
+        # original array
+            
+        y = log_mel_spec.copy()
         
         # if a random number of time masks are to be applied
         
@@ -282,21 +293,28 @@ class SpecAugment:
         
         # number of time steps in spectrogram
         
-        tau = mel_spec.shape[1]
+        tau = y.shape[1]
         
         # generate num_masks time masks
         
         for _ in range(0,num_masks):
             
             t = self.rng.integers(0,self.T,
-                             endpoint = True)
+                                  endpoint = True)
             
             t_0 = self.rng.integers(0,tau - t,
-                               endpoint = True)
+                                    endpoint = True)
             
-            mel_spec[:, t_0:t_0 + t] = np.mean(mel_spec)
+            y[:, t_0:t_0 + t] = np.mean(y)
         
-    def frequency_mask(self,mel_spec):
+        return y
+        
+    def frequency_mask(self,log_mel_spec):
+        
+        # numpy arrays are mutable, so need to make copy to avoid modifying
+        # original array
+            
+        y = log_mel_spec.copy()
         
         # if a random number of frequency masks are to be applied
                 
@@ -308,7 +326,7 @@ class SpecAugment:
         
         # number of Mels in spectrogram
         
-        v = mel_spec.shape[0]
+        v = y.shape[0]
         
         # generate num_masks frequency masks
         
@@ -320,29 +338,25 @@ class SpecAugment:
             f_0 = self.rng.integers(0,v - f,
                                endpoint = True)
             
-            mel_spec[f_0:f_0 + f,:] = np.mean(mel_spec)
+            y[f_0:f_0 + f,:] = np.mean(y)
         
-    def __call__(self,mel_spectrogram):
+        return y
+        
+    def __call__(self,log_mel_spec):
         
         # lists to store augmentations
         
         augmentations = []
         
-        # track type of augmentations
+        # track number of each augmentation
             
         time_warped = 0
         time_masked = 0
         frequency_masked = 0
         
-        # apply random transformations. Note that mel_spec is modified in-place
-        # using these methods because it is a mutable numpy array
+        # apply transformations randomly
         
         for _ in range(self.num_aug):
-            
-            # numpy arrays are mutable, so need to make copy to avoid modifying
-            # original array
-            
-            mel_spec = mel_spectrogram.copy()
             
             # sample categorical random variable from 0 - 7
             
@@ -354,52 +368,52 @@ class SpecAugment:
             
             if x == 1:
                 
-                self.frequency_mask(mel_spec)
+                y = self.frequency_mask(log_mel_spec)
                 frequency_masked += 1
             
             if x == 2:
                 
-                self.time_mask(mel_spec)
+                y = self.time_mask(log_mel_spec)
                 time_masked += 1
             
             if x == 3:
                 
-                self.time_mask(mel_spec)
-                self.frequency_mask(mel_spec)
+                y = self.time_mask(log_mel_spec)
+                y = self.frequency_mask(y)
                 time_masked += 1
                 frequency_masked += 1
             
             if x == 4:
                 
-                self.time_warp(mel_spec)
+                y = self.time_warp(log_mel_spec)
                 time_warped += 1
                 
             if x == 5:
                 
-                self.time_warp(mel_spec)
-                self.frequency_mask(mel_spec)
+                y = self.time_warp(log_mel_spec)
+                y = self.frequency_mask(y)
                 time_warped += 1
                 frequency_masked += 1
             
             if x == 6:
                 
-                self.time_warp(mel_spec)
-                self.time_mask(mel_spec)
+                y = self.time_warp(log_mel_spec)
+                y = self.time_mask(y)
                 time_warped += 1
                 time_masked += 1
             
             if x == 7:
                 
-                self.time_warp(mel_spec)
-                self.time_mask(mel_spec)
-                self.frequency_mask(mel_spec)
+                y = self.time_warp(log_mel_spec)
+                y = self.time_mask(y)
+                y = self.frequency_mask(y)
                 time_warped += 1
                 time_masked += 1
                 frequency_masked += 1
             
             # save the augmentation
             
-            augmentations.append(mel_spec)
+            augmentations.append(y)
         
         proportions = [time_warped/self.num_aug,
                        time_masked/self.num_aug,
@@ -407,33 +421,36 @@ class SpecAugment:
         
         return augmentations,proportions
     
-    def show_augmentation(self,mel_spec,augmentations):
+    def show_aug(self,log_mel_spec,augmentations):
+        
+        # pick a transformed log Mel spectrogram at random from the list of
+        # augmentations
         
         aug = random.choice(augmentations)
         
-        # original spectrogram
+        # display the original spectrogram
     
         plt.subplot(2,1,1)
-        
-        # display the original spectrogram
         
         librosa.display.specshow(log_mel_spec,
                                  x_axis='time',
                                  y_axis='mel')
-        plt.colorbar(format='%+2.0f dB')
-        plt.title('Mel spectrogram')
         
-        # masked spectrogram
+        plt.colorbar(format='%+2.0f dB')
+        
+        plt.title('Original Mel spectrogram')
+        
+        # display the transformed spectrogram
         
         plt.subplot(2,1,2)
-        
-        # display the masked spectrogram
         
         librosa.display.specshow(aug,
                                  x_axis='time',
                                  y_axis='mel')
+        
         plt.colorbar(format='%+2.0f dB')
-        plt.title('Mel spectrogram')
+        
+        plt.title('Transformed Mel spectrogram')
         
         plt.tight_layout()
         
@@ -453,17 +470,19 @@ if __name__ == '__main__':
                                               power = 2.0,
                                               n_mels = 256)
     
-    log_mel_spec = mel_spec = librosa.power_to_db(mel_spec,
-                                                  ref = np.max)
+    log_mel_spec = librosa.power_to_db(mel_spec,
+                                       ref = np.max)
     
     spec_augment = SpecAugment(num_aug = 100,
-                               p = [0.9,0.5,0.5],
+                               p = [0.4,0.4,0.8],
                                time_warp_param = 30,
                                time_mask_param = 20,
-                               frequency_mask_param = 20,
+                               frequency_mask_param = 30,
                                num_time_masks = 2,
                                num_frequency_masks = 3,
                                num_masks_random = True)
     
     augmentations,proportions = spec_augment(log_mel_spec)
+    
+    spec_augment.show_aug(log_mel_spec,augmentations)
             
