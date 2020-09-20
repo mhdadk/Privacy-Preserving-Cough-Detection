@@ -474,7 +474,7 @@ if __name__ == '__main__':
                                        ref = np.max)
     
     spec_augment = SpecAugment(num_aug = 100,
-                               p = [0.4,0.4,0.8],
+                               p = [0.4,0.4,0.4],
                                time_warp_param = 30,
                                time_mask_param = 20,
                                frequency_mask_param = 30,
