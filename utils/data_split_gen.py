@@ -1,6 +1,6 @@
 import os
 from sklearn.model_selection import train_test_split
-import csv
+import pickle
 
 data_dir = '../../data'
 
@@ -31,6 +31,16 @@ for label in os.listdir(data_dir):
     if not os.path.isdir(data_split_dir):
         os.mkdir(data_split_dir)
     
+    with open(os.path.join(data_split_dir,label+'_train.pkl'),'wb') as fp:
+        pickle.dump(train,fp)
+    
+    with open(os.path.join(data_split_dir,label+'_val.pkl'),'wb') as fp:
+        pickle.dump(val,fp)
+    
+    with open(os.path.join(data_split_dir,label+'_test.pkl'),'wb') as fp:
+        pickle.dump(test,fp)
+    
+    """
     with open(os.path.join(data_split_dir,label+'_train.csv'),mode='w') as fp:
         writer = csv.writer(fp,
                             delimiter=',',
@@ -54,3 +64,4 @@ for label in os.listdir(data_dir):
                             quoting=csv.QUOTE_MINIMAL)
         for filename in test:
             writer.writerow([os.path.join(data_dir,label,filename)])
+    """
