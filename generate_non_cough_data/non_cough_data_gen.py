@@ -76,10 +76,11 @@ def get_stats(x,sr,frame_sample_length=0.064):
     
     return frames_rms_mean,frames_entropy_mean
 
-# where audio files are stored
+# where audio files are stored and where audio snippets should be written
 
-data_dir = '../../data/test'
-files = os.listdir(data_dir)
+src_dir = '../../data/speech'
+files = os.listdir(src_dir)
+dst_dir = '../../data/speech_cropped'
 
 # initialize random number generator
 
@@ -90,7 +91,7 @@ for file in files:
     # get the total length of the audio file
     
     file_length_sec = librosa.get_duration(
-                            filename = os.path.join(data_dir,file))
+                            filename = os.path.join(src_dir,file))
     
     # check how many small snippets of audio have successfully been
     # admitted and written to disk
@@ -141,7 +142,11 @@ for file in files:
         
         next_loop = 0
         
-        # c
+        # check if the current offset that was sampled above is within
+        # 1 second of the previous offsets that were sampled and
+        # previously admitted. Since an audio snippet is 1 second long,
+        # then it makes sense to restrict offsets to be at least 1 second
+        # away from each other so that overlapping snippets do not occur
         
         for j in prev_offsets:
             if abs(offset - j) < 1:
@@ -150,17 +155,40 @@ for file in files:
         
         if next_loop:
             continue
-                
-        x,sr = librosa.load(path = os.path.join(data_dir,file),
+        
+        # load 1 second audio snippet from file
+        
+        x,sr = librosa.load(path = os.path.join(src_dir,file),
                            sr = None,
                            mono = True,
                            offset = offset,
                            duration = 1)
+        
+        # compute mean rms and mean entropy values
+        
         rms_mean,entropy_mean = get_stats(x,sr)
-        if rms_mean > 0.035 or entropy_mean < 6.0:
+        
+        # these values were determined by estimation over a large number
+        # of files. See check_thresholds.py for details. Note that the
+        # 'or' can be changed to 'and' for better quality audio snippets.
+        # However, this comes at the cost of increased computation and
+        # less output
+        
+        if rms_mean > 0.035 and entropy_mean < 6.0:
+            
+            # indicate that 1 more audio snippet is successfully admitted
+            
             num_passed += 1
+            
+            # record the offset that was used to produce this snippet
+            
             prev_offsets.append(offset)
-            sf.write(file = os.path.join(data_dir,
-                                         file[:-4]+'_'+str(num_passed)+'.wav'),
+            
+            # write the audio snippet to disk
+            
+            root,_ = os.path.splitext(file)
+            
+            sf.write(file = os.path.join(dst_dir,
+                                         root+'_'+str(num_passed)+'.wav'),
                      data = x,
                      samplerate = sr)
