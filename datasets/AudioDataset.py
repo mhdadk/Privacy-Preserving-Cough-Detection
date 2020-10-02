@@ -5,13 +5,11 @@ import torchaudio
 
 class AudioDataset(torch.utils.data.Dataset):
     
-    def __init__(self,data_split_dir,sample_rate,net_type,mode):
+    def __init__(self,data_dir,data_split_dir,sample_rate,net_type,mode):
         
-        """
-        training 'train', validation 'val', or testing 'test' mode
-        """
+        # where the data is stored
         
-        self.mode = mode
+        self.data_dir = data_dir
         
         """
         Where the pickled lists containing paths to the training, validation,
@@ -30,6 +28,18 @@ class AudioDataset(torch.utils.data.Dataset):
         """
         
         self.net_type = net_type
+        
+        """
+        training 'train', validation 'val', or testing 'test' mode
+        """
+        
+        self.mode = mode
+        
+        # what the label numbers mean
+        
+        self.label_map = {0:'other',
+                          1:'cough',
+                          2:'speech'}
         
         """
         get paths to the training, validation, and testing files
@@ -84,11 +94,14 @@ class AudioDataset(torch.utils.data.Dataset):
         
         # load audio file and its sample rate
         
-        x,sr = torchaudio.load(path = self.paths[idx])
+        x,sr = torchaudio.load(
+                    filepath = os.path.join(self.data_dir,
+                                            self.label_map[label],
+                                            self.paths[idx]))
         
         # convert to mono
         
-        x = torch.mean(x,dim=1)
+        x = torch.mean(x,dim=0)
         
         # crop to 1 second if necessary
         
@@ -117,23 +130,26 @@ class AudioDataset(torch.utils.data.Dataset):
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
-    
-    from playsound import playsound
+    import sounddevice as sd
+    import random
     
     data_dir = '../../data'
-    
-    sample_rate = 22050 # Hz
-    
-    mode = 'test'
-    
-    dataset = AudioDataset(data_dir,sample_rate,mode)
+    data_split_dir = '../../data_split'
+    sample_rate = 16000
+    net_type = 'recon'
+    mode = 'val'
+    dataset = AudioDataset(data_dir,
+                           data_split_dir,
+                           sample_rate,
+                           net_type,
+                           mode)
     
     idx = random.randint(0,len(dataset))
+    x,label = dataset[idx]
     
-    image,label = dataset[idx]
-    
-    print('\nShowing spectrogram for:\n{}'.format(dataset.paths[idx]))
-    
-    plt.imshow(image[0])
-        
-    playsound(dataset.paths[idx])
+    print('\nShowing signal for:\n{}'.format(os.path.join(
+                                                data_dir,
+                                                dataset.label_map[label],
+                                                dataset.paths[idx])))
+    plt.plot(x.numpy())
+    sd.play(x.numpy(),sample_rate)
