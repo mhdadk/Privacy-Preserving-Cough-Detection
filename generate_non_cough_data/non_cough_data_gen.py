@@ -78,9 +78,9 @@ def get_stats(x,sr,frame_sample_length=0.064):
 
 # where audio files are stored and where audio snippets should be written
 
-src_dir = '../../data/speech'
+src_dir = '../../data/other'
 files = os.listdir(src_dir)
-dst_dir = '../../data/speech_cropped'
+dst_dir = '../../data/other_cropped'
 
 # initialize random number generator
 
@@ -116,7 +116,7 @@ for file in files:
     # start randomly searching for snippets until 3 audio snippets have
     # successfully been admitted and written to disk
     
-    while num_passed != 3:
+    while num_passed != 6:
         
         # while loop counter
         
@@ -174,7 +174,7 @@ for file in files:
         # However, this comes at the cost of increased computation and
         # less output
         
-        if rms_mean > 0.035 and entropy_mean < 6.0:
+        if rms_mean > 0.035 or entropy_mean < 6.0:
             
             # indicate that 1 more audio snippet is successfully admitted
             
