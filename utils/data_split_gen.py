@@ -40,28 +40,3 @@ for label in os.listdir(data_dir):
     with open(os.path.join(data_split_dir,label+'_test.pkl'),'wb') as fp:
         pickle.dump(test,fp)
     
-    """
-    with open(os.path.join(data_split_dir,label+'_train.csv'),mode='w') as fp:
-        writer = csv.writer(fp,
-                            delimiter=',',
-                            lineterminator = '\n',
-                            quoting=csv.QUOTE_MINIMAL)
-        for filename in train:
-            writer.writerow([os.path.join(data_dir,label,filename)])
-        
-    with open(os.path.join(data_split_dir,label+'_val.csv'),mode='w') as fp:
-        writer = csv.writer(fp,
-                            delimiter=',',
-                            lineterminator = '\n',
-                            quoting=csv.QUOTE_MINIMAL)
-        for filename in val:
-            writer.writerow([os.path.join(data_dir,label,filename)])
-    
-    with open(os.path.join(data_split_dir,label+'_test.csv'),mode='w') as fp:
-        writer = csv.writer(fp,
-                            delimiter=',',
-                            lineterminator = '\n',
-                            quoting=csv.QUOTE_MINIMAL)
-        for filename in test:
-            writer.writerow([os.path.join(data_dir,label,filename)])
-    """
