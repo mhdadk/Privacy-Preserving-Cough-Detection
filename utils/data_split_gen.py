@@ -1,12 +1,13 @@
 import os
 from sklearn.model_selection import train_test_split
 import pickle
+from glob import glob
 
 data_dir = '../../data'
 
 for label in os.listdir(data_dir):
     
-    filenames = os.listdir(os.path.join(data_dir,label))
+    filenames = glob(os.path.join(data_dir,label,'*'))
     
     rng_seed = 42
     
