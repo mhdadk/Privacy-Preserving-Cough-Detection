@@ -10,6 +10,10 @@ from net_test import test
 import copy
 import time
 
+# for reproducibility
+
+torch.manual_seed(0)
+
 # check if GPU is available
 
 use_cuda = torch.cuda.is_available()
@@ -20,25 +24,28 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 # get discriminator network
 
-net = Disc()
+net = Disc().to(device)
 
 # initialize datasets and dataloaders
 
-data_dir = '../../data'
 data_split_dir = '../../data_split'
 sample_rate = 16000
-net_type = 'disc'
 datasets = {}
 # optimize dataloaders with GPU if available
 dl_config = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 dataloaders = {}
 
 for dataset,batch_size in [('train',64),('val',64),('test',64)]:
-    datasets[dataset] = AudioDataset(data_dir,
-                                     data_split_dir,
-                                     sample_rate,
-                                     net_type,
-                                     mode=dataset)
+    disc_dataset = AudioDataset(net_type='disc',
+                                data_split_dir=data_split_dir,
+                                sample_rate=sample_rate,
+                                mode=dataset)
+    recon_dataset = AudioDataset(net_type='disc',
+                                 data_split_dir=data_split_dir,
+                                 sample_rate=sample_rate,
+                                 mode=dataset)
+    datasets[dataset] = torch.utils.data.ConcatDataset([disc_dataset,
+                                                        recon_dataset])
     dataloaders[dataset] = torch.utils.data.DataLoader(
                                dataset = datasets[dataset],
                                batch_size = batch_size,
@@ -47,13 +54,12 @@ for dataset,batch_size in [('train',64),('val',64),('test',64)]:
 
 # initialize loss function
 
-loss_func = torch.nn.BCEWithLogitsLoss()
+loss_func = torch.nn.BCEWithLogitsLoss(reduction='sum')
 
-# initialize optimizer
+# initialize optimizer. Must put net parameters on GPU before this step
 
-optimizer = torch.optim.SGD(params = net.parameters(),
-                            lr = 0.001,
-                            momentum = 0.9)
+optimizer = torch.optim.Adam(params = net.parameters(),
+                             lr = 0.0003)
 
 # initialize learning rate scheduler
     
@@ -128,7 +134,7 @@ print('Best Validation Accuracy: {:.2f}%'.format(best_val_acc*100))
 
 print('\nTesting...')
 
-metrics = test(net,test_dataloader,device)
+metrics = test(net,dataloaders['test'],device)
 
 print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
 print('Sensitivity/Recall: {:.3f}'.format(metrics['sens']))
