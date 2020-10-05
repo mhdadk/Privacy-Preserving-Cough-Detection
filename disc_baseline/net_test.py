@@ -1,5 +1,5 @@
 import torch
-
+import torchaudio
 from sklearn.metrics import confusion_matrix
 
 def test(net,dataloader,device):
@@ -14,15 +14,23 @@ def test(net,dataloader,device):
     
     labels_all = []
     
-    for images,labels in dataloader:
+    for signals,labels in dataloader:
         
         # load onto GPU
         
-        images = images.to(device)
+        signals = signals.to(device).unsqueeze(dim=1)
         
         # store labels
         
         labels_all.extend(labels.tolist())
+        
+        # compute log Mel spectrogram
+        
+        images = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
+                                             n_fft = 1024,
+                                             n_mels = 256,
+                                             hop_length = 63)(signals)
+        images = torchaudio.transforms.AmplitudeToDB()(images)
         
         # don't compute grad_fn to conserve RAM
         
@@ -30,7 +38,7 @@ def test(net,dataloader,device):
         
             # outputs of net for batch input
             
-            outputs = net(images)
+            outputs = net(images).squeeze()
         
         # since sigmoid(0) = 0.5, then negative values correspond to class 0
         # and positive values correspond to class 1
@@ -81,60 +89,3 @@ def test(net,dataloader,device):
     }
     
     return metrics
-
-if __name__ == '__main__':
-    
-    from AudioDataset import AudioDataset
-    
-    from torchvision import models
-    
-    from torch import nn
-        
-    # to put tensors on GPU if available
-    
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    # get the pretrained model
-    
-    net = models.mobilenet_v2(pretrained=True,progress=True)
-    
-    # modify last layer to account for two classes
-    
-    in_features = net.classifier[-1].in_features
-    
-    out_features = 1
-    
-    net.classifier[-1] = nn.Linear(in_features = in_features,
-                                   out_features = out_features,
-                                   bias = True)
-    
-    # load best parameters
-    
-    net.load_state_dict(torch.load('../../models/mobilenet_best.pt'))
-    
-    # initialize datasets and dataloaders
-    
-    data_dir = '../../data'
-    
-    sample_rate = 22050
-    
-    test_dataset = AudioDataset(data_dir,sample_rate,'test')
-    
-    test_dataloader = torch.utils.data.DataLoader(
-                       dataset = test_dataset,
-                       batch_size = 8,
-                       shuffle = True,
-                       num_workers = 0,
-                       pin_memory = (device == 'cuda'))
-    
-    metrics = test(net,test_dataloader,device)
-    
-    print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
-    print('Sensitivity/Recall: {:.3f}'.format(metrics['sens']))
-    print('Specificity: {:.3f}'.format(metrics['spec']))
-    print('Accuracy: {:.3f}'.format(metrics['acc']))
-    print('Balanced Accuracy: {:.3f}'.format(metrics['bal_acc']))
-    print('Matthews correlation coefficient: {:.3f}'.format(metrics['MCC']))
-    print('Precision/PPV: {:.3f}'.format(metrics['PPV']))
-    print('NPV: {:.3f}'.format(metrics['NPV']))
-        
