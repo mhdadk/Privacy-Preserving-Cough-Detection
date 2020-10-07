@@ -12,17 +12,44 @@ Stage6 = 512 x 4 x 3
 Stage7 = 1024 x 3 x 2
 """
 
-x = torch.randn(1,1024,3,2)
+x = torch.randn(1,1024,1,1)
+in_channels = x.shape[1]
+activation = torch.nn.ReLU()
+
+# stage 1 part 1, inverse of average pool
+
+conv1 = torch.nn.ConvTranspose2d(in_channels = in_channels,
+                                 out_channels = in_channels,
+                                 kernel_size = (3,2),
+                                 stride = (2,2),
+                                 padding = (0,0))
+
+# stage 1 part 2
+
+conv2 = torch.nn.Conv2d(in_channels = in_channels,
+                        out_channels = in_channels,
+                        kernel_size = (3,2),
+                        stride = (1,1),
+                        padding = (2,1))
+
+batch_norm1 = torch.nn.BatchNorm2d(in_channels)
+
+# stage 1
+
+stages = [torch.nn.Sequential(conv1,
+                              conv2,
+                              batch_norm1,
+                              activation)]
 
 kernels = [((3,3),(3,3)),
-           ((3,3),(3,3)),
            ((3,3),(3,2)),
+           ((3,3),(3,3)),
            ((3,3),(3,3)),
            ((3,3),(3,3)),
            ((3,3),(3,3))]
 
 strides = [((2,2),(1,1)),
-           ((2,3),(1,1)),
+           ((2,2),(1,1)),
            ((2,2),(1,1)),
            ((2,2),(1,1)),
            ((2,2),(1,1)),
@@ -30,14 +57,12 @@ strides = [((2,2),(1,1)),
 
 paddings = [((0,0),(0,0)),
             ((0,0),(0,0)),
-            ((0,0),(0,0)),
             ((0,0),(0,2)),
+            ((0,0),(0,1)),
             ((0,0),(0,1)),
             ((0,0),(0,1))]
 
-stages2 = []
-in_channels = 1024
-activation = torch.nn.ReLU()
+# next 6 stages
 
 for kernel,stride,padding in zip(kernels,strides,paddings):
 
@@ -63,18 +88,16 @@ for kernel,stride,padding in zip(kernels,strides,paddings):
     
     # stage
     
-    stages2 += torch.nn.Sequential(conv1,
-                                   batch_norm1,
-                                   activation,
-                                   conv2,
-                                   batch_norm2,
-                                   activation)
+    stages.append(torch.nn.Sequential(conv1,
+                                      batch_norm1,
+                                      activation,
+                                      conv2,
+                                      batch_norm2,
+                                      activation))
     
     in_channels = int(in_channels/2)
 
-# stage 7
-
-# part 1    
+# stage 8 part 1
 
 conv1 = torch.nn.ConvTranspose2d(in_channels = in_channels,
                                  out_channels = 1,
@@ -84,7 +107,7 @@ conv1 = torch.nn.ConvTranspose2d(in_channels = in_channels,
 
 batch_norm1 = torch.nn.BatchNorm2d(1)
 
-# part 2
+# stage 8 part 2
 
 zero_pad = torch.nn.ZeroPad2d(padding = (0,1,0,0))
 conv2 = torch.nn.Conv2d(in_channels = 1,
@@ -95,19 +118,19 @@ conv2 = torch.nn.Conv2d(in_channels = 1,
 
 batch_norm2 = torch.nn.BatchNorm2d(1)
 
-# stage
+# stage 8
 
-stages2 += torch.nn.Sequential(conv1,
-                               batch_norm1,
-                               activation,
-                               zero_pad,
-                               conv2,
-                               batch_norm2,
-                               activation)
+stages.append(torch.nn.Sequential(conv1,
+                                  batch_norm1,
+                                  activation,
+                                  zero_pad,
+                                  conv2,
+                                  batch_norm2,
+                                  activation))
 
 # build net
 
-net = torch.nn.Sequential(*stages2)
+net = torch.nn.Sequential(*stages)
 
 # test net
 
