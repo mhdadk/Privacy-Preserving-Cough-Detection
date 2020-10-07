@@ -4,7 +4,7 @@ from nets.Disc import Disc
 from datasets.AudioDataset import AudioDataset
 
 from net_utils.train import train
-from net_utils.val import validate
+from net_utils.validate import validate
 from net_utils.test import test
 
 import copy
@@ -24,12 +24,11 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 # get discriminator network
 
-param_path = 'nets/mx-h64-1024_0d3-1.17.pkl'
-net = Disc(param_path).to(device)
+net = Disc().to(device)
 
 # initialize datasets and dataloaders
 
-data_split_dir = '../data_split'
+data_split_dir = '../../data_split'
 sample_rate = 16000
 datasets = {}
 # optimize dataloaders with GPU if available
