@@ -3,9 +3,8 @@ from .FENet import FENet
 
 class Disc(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(self,param_path):
         super(Disc, self).__init__()
-        param_path = './mx-h64-1024_0d3-1.17.pkl'
         self.feature_extractor = FENet(param_path)
         # freeze weights of feature extractor
         for param in self.feature_extractor.parameters():
@@ -18,5 +17,3 @@ class Disc(torch.nn.Module):
         x = self.feature_extractor(x)
         x = self.fc1(x)
         return x
-
-net = Disc()
