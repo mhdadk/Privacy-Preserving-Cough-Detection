@@ -4,10 +4,17 @@ import pickle
 from glob import glob
 
 data_dir = '../../data'
+data_split_dir = 'data_split'
+
+if not os.path.isdir(data_split_dir):
+    os.mkdir(data_split_dir)
 
 for label in os.listdir(data_dir):
     
     filenames = glob(os.path.join(data_dir,label,'*'))
+    
+    for i in range(len(filenames)):
+        filenames[i] = filenames[i].replace('\\','/')
     
     rng_seed = 42
     
@@ -26,11 +33,6 @@ for label in os.listdir(data_dir):
     print('{} train ratio = {}'.format(label,len(train)/len(filenames)))
     print('{} val ratio = {}'.format(label,len(val)/len(filenames)))
     print('{} test ratio = {}'.format(label,len(test)/len(filenames)))
-    
-    data_split_dir = '../../data_split'
-    
-    if not os.path.isdir(data_split_dir):
-        os.mkdir(data_split_dir)
     
     with open(os.path.join(data_split_dir,label+'_train.pkl'),'wb') as fp:
         pickle.dump(train,fp)
