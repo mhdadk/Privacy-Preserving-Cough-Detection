@@ -49,7 +49,7 @@ for dataset,batch_size in [('train',train_batch_size),
                                 data_split_dir=data_split_dir,
                                 sample_rate=sample_rate,
                                 mode=dataset)
-    recon_dataset = AudioDataset(net_type='disc',
+    recon_dataset = AudioDataset(net_type='recon',
                                  data_split_dir=data_split_dir,
                                  sample_rate=sample_rate,
                                  mode=dataset)
@@ -77,25 +77,60 @@ optimizer = torch.optim.Adam(params = net.parameters(),
 #                                           gamma = 0.5,
 #                                           last_epoch = -1)
 
-# number of epochs to train and validate for
+# whether to sample a single batch for a trial run
 
-num_epochs = 20
+trial_run = False
 
-# best validation accuracy
+# otherwise, set the number of epochs to train and validate for
+
+if not trial_run:
+    num_epochs = 20
+
+# record the best validation accuracy across epochs
 
 best_val_acc = 0
 
-# starting time
+# helper functions
 
-start = time.time()
+def train_batch(signals,labels,device,net,loss_func,optimizer):
+       
+    # compute log Mel spectrogram
+    
+    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
+                                                    n_fft = 1024,
+                                                    n_mels = 256,
+                                                    hop_length = 63).to(device)
+    to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
+    images = to_dB(mel_spec(signals)).unsqueeze(dim=1) # add grayscale image channel
+    
+    # zero the accumulated parameter gradients
+    
+    optimizer.zero_grad()
+    
+    # outputs of net for batch input
+    
+    outputs = net(images).squeeze() # needed for loss_func
+    
+    # compute loss
+    
+    loss = loss_func(outputs,labels)
+    
+    # compute loss gradients with respect to parameters
+    
+    loss.backward()
+    
+    # update parameters according to optimizer
+    
+    optimizer.step()
+    
+    # record predictions. since sigmoid(0) = 0.5, then negative values
+    # correspond to class 0 and positive values correspond to class 1
+    
+    preds = outputs > 0
+    
+    return loss,preds
 
-for epoch in range(num_epochs):
-    
-    # record the epoch start time
-    
-    epoch_start = time.time()
-    
-    # training #####################################################################
+def train_epoch(net,dataloader,device,loss_func,optimizer):
     
     # put net in training mode
     
@@ -111,74 +146,67 @@ for epoch in range(num_epochs):
     
     total_loss = 0
     
-    # show number of epochs elapsed
-    
-    print('Epoch {}/{}'.format(epoch+1, num_epochs))
-    
-    for i,(signals,labels) in enumerate(dataloaders['train']):
+    for i,(signals,labels) in enumerate(dataloader):
         
         # track progress
         
-        print('Progress: {:.2f}%'.format(i*dataloaders['train'].batch_size/len(dataloaders['train'])),
+        print('Progress: {:.2f}%'.format(i*dataloader.batch_size/
+                                         len(dataloader.dataset)),
               end='\r',flush=True)
         
         # move to GPU
-        
+    
         signals = signals.to(device)
         labels = labels.to(device).type_as(signals) # needed for BCE loss
         
-        # compute log Mel spectrogram
+        # train over the batch
         
-        mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
-                                                        n_fft = 1024,
-                                                        n_mels = 256,
-                                                        hop_length = 63).to(device)
-        to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
-        images = to_dB(mel_spec(signals)).unsqueeze(dim=1) # add grayscale image channel
-        
-        # zero the accumulated parameter gradients
-        
-        optimizer.zero_grad()
-        
-        # outputs of net for batch input
-        
-        outputs = net(images).squeeze() # needed for loss_func
-        
-        # compute (mean) loss
-        
-        loss = loss_func(outputs,labels)
-        
-        # compute loss gradients with respect to parameters
-        
-        loss.backward()
-        
-        # update parameters according to optimizer
-        
-        optimizer.step()
+        loss,preds = train_batch(signals,labels,device,net,loss_func,
+                                 optimizer)
         
         # record running statistics
         
-        # since sigmoid(0) = 0.5, then negative values correspond to class 0
-        # and positive values correspond to class 1
+        num_true_pred += torch.sum(preds == labels).item()
+        total_loss += loss.item()
+    
+    train_loss = total_loss / len(dataloader.dataset)
+    train_acc = num_true_pred / len(dataloader.dataset)
+    
+    return train_loss,train_acc
+
+def val_batch(signals,labels,device,net,loss_func):
+    
+    # compute log Mel spectrogram
+    
+    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
+                                                    n_fft = 1024,
+                                                    n_mels = 256,
+                                                    hop_length = 63).to(device)
+    to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
+    images = to_dB(mel_spec(signals)).unsqueeze(dim=1) # add grayscale image channel
+    
+    with torch.no_grad():
         
-        class_preds = outputs > 0
-        num_true_pred = num_true_pred + torch.sum(class_preds == labels)
-        
-        # loss is not mean-reduced
-        
-        total_loss += loss
+        # outputs of net for batch input
+
+        outputs = net(images).squeeze()
+
+        # compute loss
+
+        loss = loss_func(outputs,labels)
     
-    train_loss = total_loss.item() / len(dataloaders['train'])
+    # record predictions. since sigmoid(0) = 0.5, then negative values
+    # correspond to class 0 and positive values correspond to class 1
     
-    train_acc = num_true_pred.item() / len(dataloaders['train'])
+    preds = outputs > 0
     
-    print('Training Loss: {:.4f}'.format(train_loss))
-    print('Training Accuracy: {:.2f}%'.format(train_acc*100))
-    
-    # validation #########################################################
+    return loss,preds
+
+
+def val_epoch(net,dataloader,device,loss_func):
     
     # put net in testing mode
-              
+                  
     net.eval()
     print('\nValidating...\n')
     
@@ -191,15 +219,12 @@ for epoch in range(num_epochs):
     
     total_loss = 0
     
-    # show number of epochs elapsed
-    
-    print('Epoch {}/{}'.format(epoch+1, num_epochs))
-    
-    for i,(signals,labels) in enumerate(dataloaders['val']):
+    for i,(signals,labels) in enumerate(dataloader):
         
         # track progress
         
-        print('Progress: {:.2f}%'.format(i*dataloaders['val'].batch_size/len(dataloaders['val'])),
+        print('Progress: {:.2f}%'.format(i*dataloader.batch_size/
+                                         len(dataloader)),
               end='\r',flush=True)
         
         # move to GPU
@@ -207,104 +232,22 @@ for epoch in range(num_epochs):
         signals = signals.to(device)
         labels = labels.to(device).type_as(signals) # needed for BCE loss
         
-        # compute log Mel spectrogram
+        # validate over the batch
         
-        mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
-                                                        n_fft = 1024,
-                                                        n_mels = 256,
-                                                        hop_length = 63).to(device)
-        to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
-        images = to_dB(mel_spec(signals)).unsqueeze(dim=1) # add grayscale image channel
-        
-        with torch.no_grad():
-            
-            # outputs of net for batch input
-
-            outputs = net(images).squeeze()
-
-            # compute loss
-
-            loss = loss_func(outputs,labels)
+        loss,preds = val_batch(signals,labels,device,net,loss_func)
         
         # record running statistics
         
-        # since sigmoid(0) = 0.5, then negative values correspond to class 0
-        # and positive values correspond to class 1
-        
-        class_preds = outputs > 0
-        num_true_pred = num_true_pred + torch.sum(class_preds == labels)
-        
-        # loss is not mean-reduced
-        
-        total_loss += loss
+        num_true_pred += torch.sum(preds == labels).item()
+        total_loss += loss.item()
     
-    val_loss = total_loss.item() / len(dataloaders['val'])
+    val_loss = total_loss / len(dataloader.dataset)
+    val_acc = num_true_pred / len(dataloader.dataset)
     
-    val_acc = num_true_pred.item() / len(dataloaders['val'])
+    return val_loss,val_acc
+
+def test_batch(net,signals,device):
     
-    print('Validation Loss: {:.4f}'.format(val_loss))
-    print('Validation Accuracy: {:.2f}%'.format(val_acc*100)) 
-    
-    # scheduler.step()
-    
-    epoch_end = time.time()
-    
-    epoch_time = time.strftime("%H:%M:%S",time.gmtime(epoch_end-epoch_start))
-    
-    print('\nEpoch Elapsed Time (HH:MM:SS): ' + epoch_time)
-    
-    # save the weights for the best validation accuracy
-        
-    if val_acc > best_val_acc:
-        
-        print('Saving checkpoint...')
-        
-        best_val_acc = val_acc
-        
-        # deepcopy needed because a dict is a mutable object
-        
-        best_parameters = copy.deepcopy(net.state_dict())
-        
-        torch.save(net.state_dict(),
-                   'best_param.pt')
-
-end = time.time()
-total_time = time.strftime("%H:%M:%S",time.gmtime(end-start))
-print('\nTotal Time Elapsed (HH:MM:SS): ' + total_time)
-print('Best Validation Accuracy: {:.2f}%'.format(best_val_acc*100))
-
-# testing ################################################################
-
-# load best parameters
-
-net.load_state_dict(torch.load('best_param.pt'))
-
-# put net in testing mode
-
-net.eval()
-
-print('\nTesting...\n')
-
-# store class predictions and the true labels
-
-class_preds = []
-true_labels = []
-
-for i,(signals,labels) in enumerate(dataloaders['test']):
-
-    # track progress
-    
-    print('Progress: {:.2f}%'.format(i*dataloaders['test'].batch_size/len(dataloaders['test'])),
-           end='\r',flush=True)
-
-    # move to GPU
-
-    signals = signals.to(device)
-    
-    # store labels
-    
-    true_labels.extend(labels.tolist())
-
     # compute log Mel spectrogram
 
     mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
@@ -319,58 +262,293 @@ for i,(signals,labels) in enumerate(dataloaders['test']):
         # outputs of net for batch input
 
         outputs = net(images)
-
-    # record running statistics
-
-    # since sigmoid(0) = 0.5, then negative values correspond to class 0
-    # and positive values correspond to class 1
-
-    class_preds.extend((outputs > 0).squeeze().tolist())
-
-CM = confusion_matrix(true_labels,class_preds,labels=[0,1])
     
-TP = CM[1,1]
+    # record predictions. since sigmoid(0) = 0.5, then negative values
+    # correspond to class 0 and positive values correspond to class 1
+    
+    preds = outputs > 0
+    
+    return preds
 
-TN = CM[0,0]
+def compute_metrics(labels,preds):
+    
+    CM = confusion_matrix(labels,preds,labels=[0,1])
+    TP = CM[1,1]
+    TN = CM[0,0]
+    FP = CM[0,1]
+    FN = CM[1,0]
+    sensitivity = TP/(TP+FN) # true positive rate (TPR)
+    specificity = TN/(TN+FP) # true negative rate (TNR)
+    accuracy = (TP+TN)/(TP+TN+FP+FN)
+    balanced_accuracy = (sensitivity+specificity)/2
+    
+    # Matthews correlation coefficient
+    
+    MCC = (TP*TN - FP*FN)/(((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**0.5)
+    
+    # positive predictive value (or precision)
+    
+    PPV = TP/(TP+FP)
+    
+    # negative predictive value
+    
+    NPV = TN/(TN+FN)
+    
+    metrics = {'CM':CM,
+               'sensitivity':sensitivity,
+               'specificity':specificity,
+               'acc':accuracy,
+               'bal_acc':balanced_accuracy,
+               'MCC':MCC,
+               'precision':PPV,
+               'NPV':NPV}
+    
+    return metrics
 
-FP = CM[0,1]
+def test(net,best_param_path,dataloader,device):
+    
+    # load best parameters
 
-FN = CM[1,0]
+    net.load_state_dict(torch.load(best_param_path))
+    
+    # put net in testing mode
+    
+    net.eval()
+    
+    print('\nTesting...\n')
+    
+    # store all labels and predictions for entire testing dataset
+    
+    all_preds = []
+    all_labels = []
+    
+    for i,(signals,labels) in enumerate(dataloader):
+    
+        # track progress
+        
+        print('Progress: {:.2f}%'.format(i*dataloader.batch_size/
+                                         len(dataloader)),
+               end='\r',flush=True)
+        
+        # move to GPU
+        
+        signals = signals.to(device)
+        
+        # record labels
+        
+        all_labels.extend(labels.tolist())
+        
+        preds = test_batch(net,signals,device)
+        
+        # record predictions
+        
+        all_preds.extend(preds.squeeze().tolist())
+    
+    metrics = compute_metrics(all_labels,all_preds)
+    
+    return metrics
 
-sensitivity = TP/(TP+FN) # true positive rate (TPR)
+# starting time
 
-specificity = TN/(TN+FP) # true negative rate (TNR)
+start = time.time()
 
-accuracy = (TP+TN)/(TP+TN+FP+FN)
+if trial_run:
+    
+    # record the epoch start time
+    
+    epoch_start = time.time()
+    
+    # training ###########################################################
+    
+    # put net in training mode
+    
+    net.train()
+    
+    # sample a batch
+    
+    loader = dataloaders['train']
+    signals,labels = next(iter(loader))
+    
+    # move to GPU
+        
+    signals = signals.to(device)
+    labels = labels.to(device).type_as(signals) # needed for BCE loss
+    
+    # train over the batch
+    
+    loss,preds = train_batch(signals,labels,device,net,loss_func,
+                             optimizer)
+    
+    # compute training accuracy over batch
+    
+    train_acc = torch.sum(preds == labels).item() / loader.batch_size
+    
+    # show results
+    
+    print('Training Loss: {:.4f}'.format(loss))
+    print('Training Accuracy: {:.2f}%'.format(train_acc*100))
+    
+    # validation #########################################################
+    
+    # put net in testing mode
+                  
+    net.eval()
+    
+    # sample a batch
+    
+    loader = dataloaders['val']
+    signals,labels = next(iter(loader))
+    
+    # move to GPU
+    
+    signals = signals.to(device)
+    labels = labels.to(device).type_as(signals) # needed for BCE loss
+    
+    # validate over the batch
+    
+    loss,preds = val_batch(signals,labels,device,net,loss_func)
+    
+    # compute training accuracy over batch
+    
+    val_acc = torch.sum(preds == labels).item() / loader.batch_size
+    
+    # show results
+    
+    print('Validation Loss: {:.4f}'.format(loss))
+    print('Validation Accuracy: {:.2f}%'.format(val_acc*100))
+    
+    epoch_end = time.time()
+    
+    epoch_time = time.strftime("%H:%M:%S",time.gmtime(epoch_end-epoch_start))
+    
+    print('\nEpoch Elapsed Time (HH:MM:SS): ' + epoch_time)
+    
+    # save the weights for the best validation accuracy
+    
+    if val_acc > best_val_acc:
+        
+        print('Saving checkpoint...')
+        
+        best_val_acc = val_acc
+        
+        # deepcopy needed because a dict is a mutable object
+        
+        best_parameters = copy.deepcopy(net.state_dict())
+        
+        torch.save(net.state_dict(),
+                   'best_param.pt')
+    
+    # testing ############################################################
+    
+    # load best parameters
 
-balanced_accuracy = (sensitivity+specificity)/2
+    net.load_state_dict(torch.load('best_param.pt'))
+    
+    # put net in testing mode
+    
+    net.eval()
+    
+    # sample a batch
+    
+    loader = dataloaders['test']
+    signals,labels = next(iter(loader))
+    
+    # move to GPU
+    
+    signals = signals.to(device)
+    
+    # test the batch
+    
+    preds = test_batch(net,signals,device).squeeze().tolist()
+    
+    # compute metrics
+    
+    metrics = compute_metrics(labels,preds)
+    
+    print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
+    print('Sensitivity/Recall: {:.3f}'.format(metrics['sensitivity']))
+    print('Specificity: {:.3f}'.format(metrics['specificity']))
+    print('Accuracy: {:.3f}'.format(metrics['acc']))
+    print('Balanced Accuracy: {:.3f}'.format(metrics['bal_acc']))
+    print('Matthews correlation coefficient: {:.3f}'.format(metrics['MCC']))
+    print('Precision/PPV: {:.3f}'.format(metrics['precision']))
+    print('NPV: {:.3f}'.format(metrics['NPV']))
+    
+else:
+    
+    for epoch in range(num_epochs):
+        
+        # show number of epochs elapsed
+        
+        print('Epoch {}/{}'.format(epoch+1, num_epochs))
+        
+        # record the epoch start time
+        
+        epoch_start = time.time()
+        
+        # train for an epoch
+    
+        train_loss,train_acc = train_epoch(net,dataloaders['train'],
+                                           device,loss_func,optimizer)
+        
+        # show results
+        
+        print('Training Loss: {:.4f}'.format(train_loss))
+        print('Training Accuracy: {:.2f}%'.format(train_acc*100))
+        
+        # validate for an epoch
+        
+        val_loss,val_acc = val_epoch(net,dataloaders['val'],device,
+                                     loss_func)
+        
+        # show results
+        
+        print('Validation Loss: {:.4f}'.format(val_loss))
+        print('Validation Accuracy: {:.2f}%'.format(val_acc*100)) 
+        
+        # update learning rate
+        
+        # scheduler.step()
+        
+        # show epoch time
+        
+        epoch_end = time.time()
+        
+        epoch_time = time.strftime("%H:%M:%S",time.gmtime(epoch_end-epoch_start))
+        
+        print('\nEpoch Elapsed Time (HH:MM:SS): ' + epoch_time)
+        
+        # save the weights for the best validation accuracy
+        
+        if val_acc > best_val_acc:
+            
+            print('Saving checkpoint...')
+            
+            best_val_acc = val_acc
+            
+            # deepcopy needed because a dict is a mutable object
+            
+            best_parameters = copy.deepcopy(net.state_dict())
+            
+            torch.save(net.state_dict(),
+                       'best_param.pt')
+        
+    # show training and validation time and best validation accuracy
+    
+    end = time.time()
+    total_time = time.strftime("%H:%M:%S",time.gmtime(end-start))
+    print('\nTotal Time Elapsed (HH:MM:SS): ' + total_time)
+    print('Best Validation Accuracy: {:.2f}%'.format(best_val_acc*100))
+    
+    # test and show results
+        
+    metrics = test(net,'best_param.pt',dataloaders['test'],device)
 
-# Matthews correlation coefficient
-
-MCC = (TP*TN - FP*FN)/(((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**0.5)
-
-# positive predictive value (or precision)
-
-PPV = TP/(TP+FP)
-
-# negative predictive value
-
-NPV = TN/(TN+FN)
-
-metrics = {'CM':CM,
-           'sens':sensitivity,
-           'spec':specificity,
-           'acc':accuracy,
-           'bal_acc':balanced_accuracy,
-           'MCC':MCC,
-           'PPV':PPV,
-           'NPV':NPV}
-
-print('\nConfusion Matrix:\n{}\n'.format(CM))
-print('Sensitivity/Recall: {:.3f}'.format(sensitivity))
-print('Specificity: {:.3f}'.format(specificity))
-print('Accuracy: {:.3f}'.format(accuracy))
-print('Balanced Accuracy: {:.3f}'.format(balanced_accuracy))
-print('Matthews correlation coefficient: {:.3f}'.format(MCC))
-print('Precision/PPV: {:.3f}'.format(PPV))
-print('NPV: {:.3f}'.format(NPV))
+    print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
+    print('Sensitivity/Recall: {:.3f}'.format(metrics['sensitivity']))
+    print('Specificity: {:.3f}'.format(metrics['specificity']))
+    print('Accuracy: {:.3f}'.format(metrics['acc']))
+    print('Balanced Accuracy: {:.3f}'.format(metrics['bal_acc']))
+    print('Matthews correlation coefficient: {:.3f}'.format(metrics['MCC']))
+    print('Precision/PPV: {:.3f}'.format(metrics['precision']))
+    print('NPV: {:.3f}'.format(metrics['NPV']))
