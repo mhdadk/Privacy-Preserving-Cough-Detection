@@ -151,7 +151,7 @@ def train_epoch(net,dataloader,device,loss_func,optimizer):
         # track progress
         
         print('Progress: {:.2f}%'.format(i*dataloader.batch_size/
-                                         len(dataloader.dataset)),
+                                         len(dataloader.dataset)*100),
               end='\r',flush=True)
         
         # move to GPU
@@ -208,7 +208,7 @@ def val_epoch(net,dataloader,device,loss_func):
     # put net in testing mode
                   
     net.eval()
-    print('\nValidating...\n')
+    print('\nValidating...')
     
     # record the number of correct predictions to compute
     # validation accuracy over entire epoch
@@ -224,7 +224,7 @@ def val_epoch(net,dataloader,device,loss_func):
         # track progress
         
         print('Progress: {:.2f}%'.format(i*dataloader.batch_size/
-                                         len(dataloader)),
+                                         len(dataloader.dataset)*100),
               end='\r',flush=True)
         
         # move to GPU
@@ -315,7 +315,7 @@ def test(net,best_param_path,dataloader,device):
     
     net.eval()
     
-    print('\nTesting...\n')
+    print('\nTesting...')
     
     # store all labels and predictions for entire testing dataset
     
@@ -327,7 +327,7 @@ def test(net,best_param_path,dataloader,device):
         # track progress
         
         print('Progress: {:.2f}%'.format(i*dataloader.batch_size/
-                                         len(dataloader)),
+                                         len(dataloader.dataset)*100),
                end='\r',flush=True)
         
         # move to GPU
@@ -480,7 +480,7 @@ else:
         
         # show number of epochs elapsed
         
-        print('Epoch {}/{}'.format(epoch+1, num_epochs))
+        print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
         
         # record the epoch start time
         
@@ -543,7 +543,8 @@ else:
     # test and show results
         
     metrics = test(net,'best_param.pt',dataloaders['test'],device)
-
+    
+    print('Testing results:')    
     print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
     print('Sensitivity/Recall: {:.3f}'.format(metrics['sensitivity']))
     print('Specificity: {:.3f}'.format(metrics['specificity']))
