@@ -37,8 +37,8 @@ def get_start_and_end(x,template):
     
     return start,end
 
-short_cough_dir = '../../data/cough'
-long_cough_dir = '../../data_archive/data_audio/1_cough'
+short_cough_dir = '../../../data/cough'
+long_cough_dir = '../../../data_archive/data_audio/1_cough'
 
 files = os.listdir(short_cough_dir)
 
