@@ -71,7 +71,7 @@ for file in files:
     
     # write starting and ending times of template in seconds
     
-    csv_writer.writerow([long_file,start/sr,end/sr])
+    csv_writer.writerow([file,start/sr,end/sr])
 
 # close the csv file
 
