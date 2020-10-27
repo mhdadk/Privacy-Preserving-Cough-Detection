@@ -2,8 +2,8 @@ import os
 import numpy as np
 import librosa
 
-uncut_cough_dir = '../../data_archive/data_audio/1_cough'
-cut_cough_dir = '../../data/cough'
+uncut_cough_dir = '../../../data_archive/data_audio/1_cough'
+cut_cough_dir = '../../../data/cough'
 test_cough = 'audioset_2_3.wav'
 substrings = test_cough.split('_')[:2]
 test_file = substrings[0]+'_'+substrings[1]+'.wav'
