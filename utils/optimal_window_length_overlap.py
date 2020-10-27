@@ -83,7 +83,7 @@ x,sr = librosa.load(path = os.path.join(uncut_cough_dir,test_file),
 
 # length of overlapping windows in seconds
 
-window_length = 1.5 # seconds
+window_length = 2 # seconds
 
 # length of overlap in seconds. This should be bigger than the max length
 # of a cough
@@ -112,6 +112,11 @@ for i in range(num_overlap_windows):
     frame = x[start:end]
     
     rms,entropy = get_stats(frame,sr)
+    
+    # normalize by window length to make unbiased
+        
+    rms = rms / window_length
+    entropy = entropy / window_length
     
     # compare every two successive frames
     
