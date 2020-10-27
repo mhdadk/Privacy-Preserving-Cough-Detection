@@ -30,7 +30,7 @@ for row in csv_reader:
     
     cough_length = float(row[2]) - float(row[1])
     offset = np.random.uniform(low = 0.0,
-                                high = snippet_length - cough_length)
+                               high = snippet_length - cough_length)
     
     # need max function to account for negative starting values
     
