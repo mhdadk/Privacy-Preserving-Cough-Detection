@@ -76,14 +76,14 @@ def get_stats(x,sr,frame_sample_length=0.064):
     return frames_rms_mean,frames_entropy_mean
 
 uncut_cough_dir = '../../data_archive/data_audio/1_cough'
-test_file = 'audioset_1.wav'
+test_file = 'esc_2.wav'
 
 x,sr = librosa.load(path = os.path.join(uncut_cough_dir,test_file),
                     sr = None)
 
 # length of overlapping windows in seconds
 
-window_length = 2 # seconds
+window_length = 1.5 # seconds
 
 # length of overlap in seconds. This should be bigger than the max length
 # of a cough
@@ -112,12 +112,7 @@ for i in range(num_overlap_windows):
     frame = x[start:end]
     
     rms,entropy = get_stats(frame,sr)
-    
-    # normalize by window length to make unbiased
         
-    rms = rms / window_length
-    entropy = entropy / window_length
-    
     # compare every two successive frames
     
     if i % 2:
@@ -133,3 +128,8 @@ for i in range(num_overlap_windows):
     prev_frame = frame.copy()
     prev_rms = rms
     prev_entropy = entropy
+
+# normalize by window length to make unbiased
+
+rms_vals = rms_vals / window_length
+entropy_vals = entropy_vals / window_length
