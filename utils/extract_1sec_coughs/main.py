@@ -8,14 +8,14 @@ import numpy as np
 # so they were removed from the csv file
 
 long_cough_dir = '../../../data_archive/data_audio/1_cough'
-dst_dir = '../../../data_archive/cough_clean_auto_2sec'
+dst_dir = '../../../data_archive/cough_1-5_seconds'
 
 # lengths = np.zeros((1118,))
 
 fp = open('cough_timestamps.csv')
 csv_reader = csv.reader(fp,delimiter=',')
 
-snippet_length = 2.0
+snippet_length = 1.5
 
 for row in csv_reader:
     temp = row[0].split('_')[:2]
