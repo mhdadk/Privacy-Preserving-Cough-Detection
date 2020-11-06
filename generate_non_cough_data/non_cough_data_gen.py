@@ -78,13 +78,18 @@ def get_stats(x,sr,frame_sample_length=0.064):
 
 # where audio files are stored and where audio snippets should be written
 
-src_dir = '../../data/other'
+src_dir = '../../data_archive/data_uncropped/speech'
 files = os.listdir(src_dir)
-dst_dir = '../../data/other_cropped'
+dst_dir = '../../data/speech_cropped'
+sample_rate = 16000
 
 # initialize random number generator
 
 rng = np.random.default_rng()
+
+# how long snippets should be in seconds
+
+snippet_length = 1.5
 
 for file in files:
     
@@ -92,6 +97,11 @@ for file in files:
     
     file_length_sec = librosa.get_duration(
                             filename = os.path.join(src_dir,file))
+    
+    # skip files that are shorter than snippet_length
+    
+    if file_length_sec < snippet_length:
+        continue
     
     # check how many small snippets of audio have successfully been
     # admitted and written to disk
@@ -114,25 +124,21 @@ for file in files:
     loop_count = 0
     
     # start randomly searching for snippets until 3 audio snippets have
-    # successfully been admitted and written to disk
+    # successfully been admitted and written to disk. Otherwise, stop
+    # searching if 100 iterations pass
     
-    while num_passed != 6:
+    while (num_passed < 3 and loop_count < 100):
         
         # while loop counter
         
         loop_count += 1
-        
-        # stop searching if 100 loops pass
-        
-        if loop_count == 100:
-            break
         
         # uniformly sample an offset value between 0 and 1 second before
         # the end of the audio file. This is because a snippet is
         # 1 second long
         
         offset = rng.uniform(0.0,
-                             file_length_sec - 1,
+                             file_length_sec - snippet_length,
                              1)[0]
         
         # used to indicate whether to continue to the next loop in this
@@ -140,7 +146,7 @@ for file in files:
         # second of previous offsets that were sampled and successfully
         # admitted
         
-        next_loop = 0
+        next_loop = False
         
         # check if the current offset that was sampled above is within
         # 1 second of the previous offsets that were sampled and
@@ -149,20 +155,20 @@ for file in files:
         # away from each other so that overlapping snippets do not occur
         
         for j in prev_offsets:
-            if abs(offset - j) < 1:
-                next_loop = 1
+            if abs(offset - j) < snippet_length:
+                next_loop = True
                 break
         
         if next_loop:
             continue
         
-        # load 1 second audio snippet from file
+        # load snippet_length second audio snippet from file
         
         x,sr = librosa.load(path = os.path.join(src_dir,file),
-                           sr = None,
-                           mono = True,
-                           offset = offset,
-                           duration = 1)
+                            sr = None,
+                            mono = True,
+                            offset = offset,
+                            duration = snippet_length)
         
         # compute mean rms and mean entropy values
         
