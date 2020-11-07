@@ -9,6 +9,7 @@ import numpy as np
 
 long_cough_dir = '../../../data_archive/data_audio/1_cough'
 dst_dir = '../../../data_archive/cough_1-5_seconds'
+sample_rate = 16000
 
 # lengths = np.zeros((1118,))
 
@@ -22,9 +23,8 @@ for row in csv_reader:
     filename = temp[0]+'_'+temp[1]+'.wav'
     file_length = librosa.get_duration(filename = os.path.join(long_cough_dir,filename))
     
-    # skip audio files that are less than 1 second long and only contain
-    # coughs
-    
+    # skip audio files that are less than snippet_length seconsd long
+        
     if file_length < snippet_length:
         continue
     
@@ -37,7 +37,7 @@ for row in csv_reader:
     start = max(0,float(row[1]) - offset)
     
     x,sr = librosa.load(path = os.path.join(long_cough_dir,filename),
-                        sr = None,
+                        sr = sample_rate,
                         offset = start,
                         duration = snippet_length)
     
