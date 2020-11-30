@@ -3,7 +3,7 @@ from sklearn.model_selection import train_test_split
 import pickle
 from glob import glob
 
-data_dir = '../../data'
+data_dir = '../../temp_data'
 data_split_dir = 'data_split'
 
 if not os.path.isdir(data_split_dir):
@@ -13,8 +13,8 @@ for label in os.listdir(data_dir):
     
     filenames = glob(os.path.join(data_dir,label,'*'))
     
-    for i in range(len(filenames)):
-        filenames[i] = filenames[i].replace('\\','/')
+    # for i in range(len(filenames)):
+    #     filenames[i] = filenames[i].replace('\\','/')
     
     rng_seed = 42
     
