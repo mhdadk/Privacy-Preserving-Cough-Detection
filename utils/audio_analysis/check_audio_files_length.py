@@ -2,14 +2,15 @@ import librosa
 import os
 import numpy as np
 
-data_dir2 = '../../data/other_cropped'
+data_dir = '../../../datasets/7/RESP'
 
-files2 = os.listdir(data_dir2)
+files = os.listdir(data_dir)
 
-lengths2 = np.zeros((len(files2),))
+lengths = np.zeros((len(files),))
 
-for i,file in enumerate(files2):
-    lengths2[i] = librosa.get_duration(filename = os.path.join(data_dir2,file))
+for i,file in enumerate(files):
+    lengths[i] = librosa.get_duration(filename = os.path.join(data_dir,
+                                                              file))
 
 # mean = lengths.mean()
 # variance = lengths.var(ddof=1)
