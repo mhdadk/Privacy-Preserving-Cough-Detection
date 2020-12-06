@@ -20,8 +20,8 @@ for dataset in os.listdir(datasets_dir):
         continue
     # to store paths and labels for each dataset
     paths = []
-    # COUGH, ESC50, FSDKAGGLE2018, LIBRISPEECH, or RESP
-    for i,label in enumerate(os.listdir(os.path.join(datasets_dir,dataset))):
+    # 1_COUGH, 0_ESC50, 0_FSDKAGGLE2018, 2_LIBRISPEECH, or 0_RESP
+    for label in os.listdir(os.path.join(datasets_dir,dataset)):
         for file in os.listdir(os.path.join(datasets_dir,dataset,label)):
             paths.append([os.path.join(label,file),label[0]])
     
