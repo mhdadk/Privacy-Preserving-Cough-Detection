@@ -1,11 +1,9 @@
 import torch
 import torchaudio
-
-from Disc import Disc
-from AudioDataset import AudioDataset
-
-import copy
 import time
+
+from models.disc import Disc
+from torch_datasets.AudioDataset import AudioDataset
 
 # for reproducibility
 
@@ -19,15 +17,16 @@ use_cuda = torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-# get discriminator network
+# initialize discriminator network
 
-net = Disc().to(device)
+FENet_param_path = 'parameters/FENet/FENet.pkl'
+net = Disc(FENet_param_path).to(device)
 
 # initialize datasets and dataloaders
 
-data_split_dir = 'data_split'
+dataset_dir = '../datasets/3'
+dataset_split_dir = '../datasets_splits/3'
 sample_rate = 16000
-datasets = {}
 dataloaders = {}
 
 # optimize dataloaders with GPU if available
@@ -38,29 +37,23 @@ dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
 
 train_batch_size = 64
 val_batch_size = 64
-test_batch_size = 64
 
-for dataset,batch_size in [('train',train_batch_size),
-                           ('val',val_batch_size),
-                           ('test',test_batch_size)]:
+for mode,batch_size in [('train',train_batch_size),
+                        ('val',val_batch_size)]:
     
-    disc_dataset = AudioDataset(net_type='disc',
-                                data_split_dir=data_split_dir,
-                                sample_rate=sample_rate,
-                                mode=dataset)
-    recon_dataset = AudioDataset(net_type='recon',
-                                 data_split_dir=data_split_dir,
-                                 sample_rate=sample_rate,
-                                 mode=dataset)
-    datasets[dataset] = torch.utils.data.ConcatDataset([disc_dataset,
-                                                        recon_dataset])
-    dataloaders[dataset] = torch.utils.data.DataLoader(
-                               dataset = datasets[dataset],
+    dataset = AudioDataset(dataset_dir,
+                           dataset_split_dir,
+                           mode,
+                           sample_rate)
+    
+    dataloaders[mode] = torch.utils.data.DataLoader(
+                               dataset = dataset,
                                batch_size = batch_size,
                                shuffle = True,
                                **dl_config)
 
-# initialize loss function
+# initialize loss function (negative log-likelihood function for
+# Bernoulli distribution)
 
 loss_func = torch.nn.BCEWithLogitsLoss(reduction='sum')
 
@@ -69,21 +62,9 @@ loss_func = torch.nn.BCEWithLogitsLoss(reduction='sum')
 optimizer = torch.optim.Adam(params = net.parameters(),
                              lr = 0.0003)
 
-# initialize learning rate scheduler
-    
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer = optimizer,
-#                                           step_size = 3,
-#                                           gamma = 0.5,
-#                                           last_epoch = -1)
+# number of epochs to train and validate for
 
-# whether to sample a single batch for a trial run
-
-trial_run = False
-
-# otherwise, set the number of epochs to train and validate for
-
-if not trial_run:
-    num_epochs = 10
+num_epochs = 1
 
 # record the best validation accuracy across epochs
 
@@ -251,70 +232,41 @@ if __name__ == '__main__':
     
     start = time.time()
     
-    if trial_run:
-    
+    for epoch in range(num_epochs):
+        
+        # show number of epochs elapsed
+        
+        print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
+        
         # record the epoch start time
         
         epoch_start = time.time()
         
-        # training ###########################################################
-        
-        # put net in training mode
-        
-        net.train()
-        
-        # sample a batch
-        
-        loader = dataloaders['train']
-        signals,labels = next(iter(loader))
-        
-        # move to GPU
-            
-        signals = signals.to(device)
-        labels = labels.to(device).type_as(signals) # needed for BCE loss
-        
-        # train over the batch
-        
-        loss,preds = train_batch(signals,labels,device,net,loss_func,
-                                 optimizer)
-        
-        # compute training accuracy over batch
-        
-        train_acc = torch.sum(preds == labels).item() / loader.batch_size
+        # train for an epoch
+    
+        train_loss,train_acc = train_epoch(net,dataloaders['train'],
+                                           device,loss_func,optimizer)
         
         # show results
         
-        print('Training Loss: {:.4f}'.format(loss))
+        print('\nTraining Loss: {:.4f}'.format(train_loss))
         print('Training Accuracy: {:.2f}%'.format(train_acc*100))
         
-        # validation #########################################################
+        # validate for an epoch
         
-        # put net in testing mode
-                      
-        net.eval()
-        
-        # sample a batch
-        
-        loader = dataloaders['val']
-        signals,labels = next(iter(loader))
-        
-        # move to GPU
-        
-        signals = signals.to(device)
-        labels = labels.to(device).type_as(signals) # needed for BCE loss
-        
-        # validate over the batch
-        
-        loss,preds = val_batch(signals,labels,device,net,loss_func)
-        
-        # compute training accuracy over batch
-        
-        val_acc = torch.sum(preds == labels).item() / loader.batch_size
+        val_loss,val_acc = val_epoch(net,dataloaders['val'],device,
+                                     loss_func)
         
         # show results
         
-        print('Validation Loss: {:.4f}'.format(loss))
-        print('Validation Accuracy: {:.2f}%'.format(val_acc*100))
+        print('\nValidation Loss: {:.4f}'.format(val_loss))
+        print('Validation Accuracy: {:.2f}%'.format(val_acc*100)) 
+        
+        # update learning rate
+        
+        # scheduler.step()
+        
+        # show epoch time
         
         epoch_end = time.time()
         
@@ -337,104 +289,9 @@ if __name__ == '__main__':
             torch.save(net.state_dict(),
                        'best_param.pt')
         
-        # testing ############################################################
-        
-        # load best parameters
-        
-        net.load_state_dict(torch.load('best_param.pt'))
-        
-        # put net in testing mode
-        
-        net.eval()
-        
-        # sample a batch
-        
-        loader = dataloaders['test']
-        signals,labels = next(iter(loader))
-        
-        # move to GPU
-        
-        signals = signals.to(device)
-        
-        # test the batch
-        
-        preds = test_batch(net,signals,device).squeeze().tolist()
-        
-        # compute metrics
-        
-        metrics = compute_metrics(labels,preds)
-        
-        print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
-        print('Sensitivity/Recall: {:.3f}'.format(metrics['sensitivity']))
-        print('Specificity: {:.3f}'.format(metrics['specificity']))
-        print('Accuracy: {:.3f}'.format(metrics['acc']))
-        print('Balanced Accuracy: {:.3f}'.format(metrics['bal_acc']))
-        print('Matthews correlation coefficient: {:.3f}'.format(metrics['MCC']))
-        print('Precision/PPV: {:.3f}'.format(metrics['precision']))
-        print('NPV: {:.3f}'.format(metrics['NPV']))
+    # show training and validation time and best validation accuracy
     
-    else:
-    
-        for epoch in range(num_epochs):
-            
-            # show number of epochs elapsed
-            
-            print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
-            
-            # record the epoch start time
-            
-            epoch_start = time.time()
-            
-            # train for an epoch
-        
-            train_loss,train_acc = train_epoch(net,dataloaders['train'],
-                                               device,loss_func,optimizer)
-            
-            # show results
-            
-            print('\nTraining Loss: {:.4f}'.format(train_loss))
-            print('Training Accuracy: {:.2f}%'.format(train_acc*100))
-            
-            # validate for an epoch
-            
-            val_loss,val_acc = val_epoch(net,dataloaders['val'],device,
-                                         loss_func)
-            
-            # show results
-            
-            print('\nValidation Loss: {:.4f}'.format(val_loss))
-            print('Validation Accuracy: {:.2f}%'.format(val_acc*100)) 
-            
-            # update learning rate
-            
-            # scheduler.step()
-            
-            # show epoch time
-            
-            epoch_end = time.time()
-            
-            epoch_time = time.strftime("%H:%M:%S",time.gmtime(epoch_end-epoch_start))
-            
-            print('\nEpoch Elapsed Time (HH:MM:SS): ' + epoch_time)
-            
-            # save the weights for the best validation accuracy
-            
-            if val_acc > best_val_acc:
-                
-                print('Saving checkpoint...')
-                
-                best_val_acc = val_acc
-                
-                # deepcopy needed because a dict is a mutable object
-                
-                best_parameters = copy.deepcopy(net.state_dict())
-                
-                torch.save(net.state_dict(),
-                           'best_param.pt')
-            
-        # show training and validation time and best validation accuracy
-        
-        end = time.time()
-        total_time = time.strftime("%H:%M:%S",time.gmtime(end-start))
-        print('\nTotal Time Elapsed (HH:MM:SS): ' + total_time)
-        print('Best Validation Accuracy: {:.2f}%'.format(best_val_acc*100))
+    end = time.time()
+    total_time = time.strftime("%H:%M:%S",time.gmtime(end-start))
+    print('\nTotal Time Elapsed (HH:MM:SS): ' + total_time)
+    print('Best Validation Accuracy: {:.2f}%'.format(best_val_acc*100))
