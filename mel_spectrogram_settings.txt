@@ -27,3 +27,9 @@ batch_size = 32,
 n_fft = 1024,
 n_mels = 128,
 hop_length = 64
+
+dataset8_20epochs.pt
+batch_size = 1,
+n_fft = 1024,
+n_mels = 128,
+hop_length = 64
