@@ -154,8 +154,8 @@ net = Disc(FENet_param_path).to(device)
 
 # initialize datasets and dataloaders
 
-dataset_dir = '../datasets/4'
-dataset_split_dir = '../datasets_splits/4'
+dataset_dir = '../datasets/1'
+dataset_split_dir = '../datasets_splits/8'
 sample_rate = 16000
 dataloaders = {}
 
@@ -165,8 +165,8 @@ dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 64
-val_batch_size = 64
+train_batch_size = 1
+val_batch_size = 1
 
 for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
@@ -257,7 +257,7 @@ if __name__ == '__main__':
         if val_acc > best_val_acc:
             print('Saving checkpoint...')
             best_val_acc = val_acc
-            torch.save(net.state_dict(),'parameters/disc/dataset4_20epochs.pt')
+            torch.save(net.state_dict(),'parameters/disc/dataset8_20epochs.pt')
         
     # show training and validation time and best validation accuracy
     
