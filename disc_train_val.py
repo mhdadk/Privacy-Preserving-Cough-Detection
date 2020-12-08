@@ -5,6 +5,136 @@ import time
 from models.disc import Disc
 from torch_datasets.AudioDataset import AudioDataset
 
+# helper functions
+
+def train_batch(net,x,labels,loss_func,optimizer,device):
+    
+    # move to GPU if available
+    
+    x = x.to(device)
+    labels = labels.to(device).type_as(x) # needed for NLL
+    
+    # compute log Mel spectrogram
+    
+    log = torchaudio.transforms.AmplitudeToDB().to(device)
+    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
+                                                    n_fft = 1024,
+                                                    n_mels = 128,
+                                                    hop_length = 64).to(device)
+    log_mel_spec = log(mel_spec(x))
+    
+    # logits must have same shape as labels
+    
+    logits = net(log_mel_spec).squeeze(dim = 1)
+    
+    # compute negative log-likelihood (NLL) using logits
+    
+    NLL = loss_func(logits,labels)
+    
+    # compute gradients of NLL with respect to parameters
+    
+    NLL.backward()
+    
+    # update parameters using these gradients. Minimizing the negative
+    # log-likelihood is equivalent to maximizing the log-likelihood
+    
+    optimizer.step()
+    
+    # zero the accumulated parameter gradients
+    
+    optimizer.zero_grad()
+    
+    # record predictions. since sigmoid(0) = 0.5, then negative values
+    # correspond to class 0 and positive values correspond to class 1
+    
+    preds = logits > 0
+    
+    # record correct predictions
+    
+    true_preds = torch.sum(preds == labels)
+    
+    return NLL.item(),true_preds.item()
+
+def val_batch(net,x,labels,loss_func,device):
+    
+    # move to GPU if available
+    
+    x = x.to(device)
+    labels = labels.to(device).type_as(x) # needed for NLL
+    
+    with torch.no_grad():
+    
+        # compute log Mel spectrogram
+        
+        log = torchaudio.transforms.AmplitudeToDB().to(device)
+        mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
+                                                        n_fft = 1024,
+                                                        n_mels = 128,
+                                                        hop_length = 64).to(device)
+        log_mel_spec = log(mel_spec(x))
+        
+        # logits must have same shape as labels
+        
+        logits = net(log_mel_spec).squeeze(dim = 1)
+        
+        # compute negative log-likelihood (NLL) using logits
+        
+        NLL = loss_func(logits,labels)
+    
+    # record predictions. since sigmoid(0) = 0.5, then negative values
+    # correspond to class 0 and positive values correspond to class 1
+    
+    preds = logits > 0
+    
+    # record correct predictions
+    
+    true_preds = torch.sum(preds == labels)
+    
+    return NLL.item(),true_preds.item()
+
+def run_epoch(mode,net,dataloader,optimizer,loss_func,device):
+    
+    if mode == 'train':
+        print('Training...')
+        net.train()
+    else:
+        print('\nValidating...')
+        net.eval()
+    
+    # to compute average negative log-likelihood (NLL) per sample
+    
+    total_NLL = 0
+    
+    # to compute training accuracy per epoch
+    
+    total_true_preds = 0
+    
+    for i,(x,labels) in enumerate(dataloader):
+        
+        # track progress
+        
+        print('\rProgress: {:.2f}%'.format(i*dataloader.batch_size/
+                                         len(dataloader.dataset)*100),
+              end='',flush=True)
+        
+        # train or validate over the batch
+        
+        if mode == 'train':
+            NLL,true_preds = train_batch(net,x,labels,loss_func,optimizer,
+                                         device)
+        else:
+            NLL,true_preds = val_batch(net,x,labels,loss_func,device)
+        
+        # record running statistics
+        
+        total_NLL += NLL
+        total_true_preds += true_preds
+        
+    NLL_per_sample = total_NLL / len(dataloader.dataset)
+    acc = total_true_preds / len(dataloader.dataset)
+    
+    return NLL_per_sample,acc
+
 # for reproducibility
 
 torch.manual_seed(42)
@@ -24,8 +154,8 @@ net = Disc(FENet_param_path).to(device)
 
 # initialize datasets and dataloaders
 
-dataset_dir = '../datasets/3'
-dataset_split_dir = '../datasets_splits/3'
+dataset_dir = '../datasets/4'
+dataset_split_dir = '../datasets_splits/4'
 sample_rate = 16000
 dataloaders = {}
 
@@ -55,7 +185,7 @@ for mode,batch_size in [('train',train_batch_size),
 # initialize loss function (negative log-likelihood function for
 # Bernoulli distribution)
 
-loss_func = torch.nn.BCEWithLogitsLoss(reduction='sum')
+loss_func = torch.nn.BCEWithLogitsLoss(reduction = 'sum')
 
 # initialize optimizer. Must put net parameters on GPU before this step
 
@@ -64,167 +194,11 @@ optimizer = torch.optim.Adam(params = net.parameters(),
 
 # number of epochs to train and validate for
 
-num_epochs = 1
+num_epochs = 20
 
 # record the best validation accuracy across epochs
 
 best_val_acc = 0
-
-# helper functions
-
-def train_batch(signals,labels,device,net,loss_func,optimizer):
-       
-    # compute log Mel spectrogram
-    
-    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
-                                                    n_fft = 1024,
-                                                    n_mels = 128,
-                                                    hop_length = 64).to(device)
-    to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
-    images = to_dB(mel_spec(signals))#.unsqueeze(dim=1) # add grayscale image channel
-    
-    # zero the accumulated parameter gradients
-    
-    optimizer.zero_grad()
-    
-    # outputs of net for batch input
-    
-    outputs = net(images).squeeze() # needed for loss_func
-    
-    # compute loss
-    
-    loss = loss_func(outputs,labels)
-    
-    # compute loss gradients with respect to parameters
-    
-    loss.backward()
-    
-    # update parameters according to optimizer
-    
-    optimizer.step()
-    
-    # record predictions. since sigmoid(0) = 0.5, then negative values
-    # correspond to class 0 and positive values correspond to class 1
-    
-    preds = outputs > 0
-    
-    return loss,preds
-
-def train_epoch(net,dataloader,device,loss_func,optimizer):
-    
-    # put net in training mode
-    
-    net.train()
-    print('Training...')
-    
-    # record the number of correct predictions to compute
-    # training accuracy over entire epoch
-    
-    num_true_pred = 0
-    
-    # to compute total training loss over entire epoch
-    
-    total_loss = 0
-    
-    for i,(signals,labels) in enumerate(dataloader):
-        
-        # track progress
-        
-        print('\rProgress: {:.2f}%'.format(i*dataloader.batch_size/
-                                         len(dataloader.dataset)*100),
-              end='',flush=True)
-        
-        # move to GPU
-    
-        signals = signals.to(device)
-        labels = labels.to(device).type_as(signals) # needed for BCE loss
-        
-        # train over the batch
-        
-        loss,preds = train_batch(signals,labels,device,net,loss_func,
-                                 optimizer)
-        
-        # record running statistics
-        
-        num_true_pred += torch.sum(preds == labels).item()
-        total_loss += loss.item()
-    
-    train_loss = total_loss / len(dataloader.dataset)
-    train_acc = num_true_pred / len(dataloader.dataset)
-    
-    return train_loss,train_acc
-
-def val_batch(signals,labels,device,net,loss_func):
-    
-    # compute log Mel spectrogram
-    
-    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
-                                                    n_fft = 1024,
-                                                    n_mels = 128,
-                                                    hop_length = 64).to(device)
-    to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
-    images = to_dB(mel_spec(signals))#.unsqueeze(dim=1) # add grayscale image channel
-    
-    with torch.no_grad():
-        
-        # outputs of net for batch input
-
-        outputs = net(images).squeeze()
-
-        # compute loss
-
-        loss = loss_func(outputs,labels)
-    
-    # record predictions. since sigmoid(0) = 0.5, then negative values
-    # correspond to class 0 and positive values correspond to class 1
-    
-    preds = outputs > 0
-    
-    return loss,preds
-
-
-def val_epoch(net,dataloader,device,loss_func):
-    
-    # put net in testing mode
-                  
-    net.eval()
-    print('\nValidating...')
-    
-    # record the number of correct predictions to compute
-    # validation accuracy over entire epoch
-    
-    num_true_pred = 0
-    
-    # to compute total validation loss over entire epoch
-    
-    total_loss = 0
-    
-    for i,(signals,labels) in enumerate(dataloader):
-        
-        # track progress
-        
-        print('\rProgress: {:.2f}%'.format(i*dataloader.batch_size/
-                                         len(dataloader.dataset)*100),
-              end='',flush=True)
-        
-        # move to GPU
-        
-        signals = signals.to(device)
-        labels = labels.to(device).type_as(signals) # needed for BCE loss
-        
-        # validate over the batch
-        
-        loss,preds = val_batch(signals,labels,device,net,loss_func)
-        
-        # record running statistics
-        
-        num_true_pred += torch.sum(preds == labels).item()
-        total_loss += loss.item()
-    
-    val_loss = total_loss / len(dataloader.dataset)
-    val_acc = num_true_pred / len(dataloader.dataset)
-    
-    return val_loss,val_acc
 
 if __name__ == '__main__':
 
@@ -244,27 +218,31 @@ if __name__ == '__main__':
         
         # train for an epoch
     
-        train_loss,train_acc = train_epoch(net,dataloaders['train'],
-                                           device,loss_func,optimizer)
+        train_loss,train_acc = run_epoch('train',
+                                         net,
+                                         dataloaders['train'],
+                                         optimizer,
+                                         loss_func,
+                                         device)
         
         # show results
         
-        print('\nTraining Loss: {:.4f}'.format(train_loss))
+        print('\nAverage Training loss: {:.4f}'.format(train_loss))
         print('Training Accuracy: {:.2f}%'.format(train_acc*100))
         
         # validate for an epoch
         
-        val_loss,val_acc = val_epoch(net,dataloaders['val'],device,
-                                     loss_func)
+        val_loss,val_acc = run_epoch('val',
+                                     net,
+                                     dataloaders['val'],
+                                     optimizer,
+                                     loss_func,
+                                     device)
         
         # show results
         
-        print('\nValidation Loss: {:.4f}'.format(val_loss))
-        print('Validation Accuracy: {:.2f}%'.format(val_acc*100)) 
-        
-        # update learning rate
-        
-        # scheduler.step()
+        print('\nAverage Validation Loss: {:.4f}'.format(val_loss))
+        print('Validation Accuracy: {:.2f}%'.format(val_acc*100))
         
         # show epoch time
         
@@ -277,17 +255,9 @@ if __name__ == '__main__':
         # save the weights for the best validation accuracy
         
         if val_acc > best_val_acc:
-            
             print('Saving checkpoint...')
-            
             best_val_acc = val_acc
-            
-            # deepcopy needed because a dict is a mutable object
-            
-            best_parameters = copy.deepcopy(net.state_dict())
-            
-            torch.save(net.state_dict(),
-                       'best_param.pt')
+            torch.save(net.state_dict(),'parameters/disc/dataset4_20epochs.pt')
         
     # show training and validation time and best validation accuracy
     
