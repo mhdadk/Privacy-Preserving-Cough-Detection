@@ -40,9 +40,11 @@ class AudioDataset(torch.utils.data.Dataset):
         
         x = torch.mean(x,dim=0,keepdim=True)
         
-        # get audio signal label
+        # get audio signal label and map it to cough and non-cough labels
         
         label = self.paths.iloc[idx,1]
+        if label == 2:
+            label = 0
         
         return x,label
             
