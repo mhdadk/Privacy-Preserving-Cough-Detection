@@ -1,6 +1,50 @@
 import torch
 
 """
+Suppose that the following signal is sampled at 1 sample per second:
+    
+1,0,1,1,0,1,1,0,1
+
+Where 1 is a sample or set of samples that correspond to a cough, and
+0 is a sample or set of samples that don't correspont to a cough.
+
+This means that window sizes have lengths of:
+
+1 second = 1 sample
+2 seconds = 2 samples
+...
+
+Suppose that for cough detection, a 1 second window with 0% overlap is
+used. This means that a possible sequence of predictions given the signal
+above is:
+    
+0,0,1,0,1,1,1,1,1
+
+Notice that the sequence of predictions has the same length as the input
+signal, since each window corresponds to a single sample. This sequence
+of predictions means that the classifier achieved an accuracy of
+approximately 56%.
+
+Now suppose that for cough detection, a 2 second window with 50% overlap is
+used. This means that a possible sequence of predictions given the signal
+above is:
+    
+1,0,1,0,1,0,1,0
+
+Notice that this sequence of predictions is 1 sample shorter than the input
+signal. Because the input signal has 9 samples and the sequence of
+predictions has 8 samples, then this sequence of predictions can be
+interpolated using nearest-neighbor or linear interpolation. In the case
+of linear interpolation, the resulting filtered sequence can be rounded to
+provide binary predictions.
+
+Another method is to filter then downsample the original input signal to
+match the length of the sequence of predictions.
+
+
+
+
+    
 Suppose a signal is 6 samples long and sampled at 2 samples per second.
 This means that:
 
