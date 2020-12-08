@@ -1,35 +1,16 @@
+import csv
+
 import torch
 import torchaudio
 from sklearn.metrics import confusion_matrix
 
-from Disc import Disc
-from AudioDataset import AudioDataset
+from models.disc import Disc
+from torch_datasets.AudioDataset import AudioDataset
 
-def test_batch(net,signals,device):
+def save_metrics(labels,preds,metrics_path):
     
-    # compute log Mel spectrogram
-
-    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = 16000,
-                                                    n_fft = 1024,
-                                                    n_mels = 128,
-                                                    hop_length = 64).to(device)
-    to_dB = torchaudio.transforms.AmplitudeToDB().to(device)
-    images = to_dB(mel_spec(signals))#.unsqueeze(dim=1) # add grayscale image channel
-
-    with torch.no_grad():
-
-        # outputs of net for batch input
-
-        outputs = net(images)
-    
-    # record predictions. since sigmoid(0) = 0.5, then negative values
-    # correspond to class 0 and positive values correspond to class 1
-    
-    preds = outputs > 0
-    
-    return preds
-
-def compute_metrics(labels,preds):
+    fp = open(metrics_path,mode='w')
+    csv_writer = csv.writer(fp,delimiter=',',lineterminator='\n')
     
     CM = confusion_matrix(labels,preds,labels=[0,1])
     TP = CM[1,1]
@@ -37,21 +18,28 @@ def compute_metrics(labels,preds):
     FP = CM[0,1]
     FN = CM[1,0]
     sensitivity = TP/(TP+FN) # true positive rate (TPR)
+    csv_writer.writerow(['Sensitivity/Recall','{:.3f}'.format(sensitivity)])
     specificity = TN/(TN+FP) # true negative rate (TNR)
+    csv_writer.writerow(['Specificity','{:.3f}'.format(specificity)])
     accuracy = (TP+TN)/(TP+TN+FP+FN)
+    csv_writer.writerow(['Accuracy','{:.3f}'.format(accuracy)])
     balanced_accuracy = (sensitivity+specificity)/2
+    csv_writer.writerow(['Balanced accuracy','{:.3f}'.format(balanced_accuracy)])
     
     # Matthews correlation coefficient
     
     MCC = (TP*TN - FP*FN)/(((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**0.5)
-    
+    csv_writer.writerow(['Matthews correlation coefficient','{:.3f}'.format(MCC)])
+        
     # positive predictive value (or precision)
     
     PPV = TP/(TP+FP)
+    csv_writer.writerow(['Precision/PPV','{:.3f}'.format(PPV)])
     
     # negative predictive value
     
     NPV = TN/(TN+FN)
+    csv_writer.writerow(['NPV','{:.3f}'.format(NPV)])
     
     metrics = {'CM':CM,
                'sensitivity':sensitivity,
@@ -64,48 +52,65 @@ def compute_metrics(labels,preds):
     
     return metrics
 
-def test(net,best_param_path,dataloader,device):
+def test_batch(net,x,device):
     
-    # load best parameters
+    # move to GPU if available
+    
+    x = x.to(device)
+    
+    with torch.no_grad():
+    
+        # compute log Mel spectrogram
+        
+        log = torchaudio.transforms.AmplitudeToDB().to(device)
+        mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
+                                                        n_fft = 1024,
+                                                        n_mels = 128,
+                                                        hop_length = 64).to(device)
+        log_mel_spec = log(mel_spec(x))
+        
+        # logits must have same shape as labels
+        
+        logits = net(log_mel_spec).squeeze(dim = 1)
+    
+        # record predictions. since sigmoid(0) = 0.5, then negative values
+        # correspond to class 0 and positive values correspond to class 1
+        
+        preds = logits > 0
+    
+    return preds
 
-    net.load_state_dict(torch.load(best_param_path))
+def test_epoch(net,dataloader,device):
     
-    # put net in testing mode
-    
+    print('Testing...')
     net.eval()
     
-    print('\nTesting...')
+    # to store predictions and labels
     
-    # store all labels and predictions for entire testing dataset
-    
-    all_preds = []
     all_labels = []
+    all_preds = []
     
-    for i,(signals,labels) in enumerate(dataloader):
-    
+    for i,(x,labels) in enumerate(dataloader):
+        
         # track progress
         
         print('\rProgress: {:.2f}%'.format(i*dataloader.batch_size/
                                          len(dataloader.dataset)*100),
-               end='',flush=True)
+              end='',flush=True)
         
-        # move to GPU
-        
-        signals = signals.to(device)
-        
-        # record labels
+        # store labels per batch
         
         all_labels.extend(labels.tolist())
         
-        preds = test_batch(net,signals,device)
+        # get predictions        
         
-        # record predictions
+        preds = test_batch(net,x,device)
         
-        all_preds.extend(preds.squeeze().tolist())
+        # store predictions per batch
+        
+        all_preds.extend(preds.tolist())
     
-    metrics = compute_metrics(all_labels,all_preds)
-    
-    return metrics
+    return all_labels,all_preds
 
 # for reproducibility
 
@@ -119,35 +124,45 @@ use_cuda = torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-# get discriminator network
+# initialize discriminator network and load parameters
 
-net = Disc().to(device)
+FENet_param_path = 'parameters/FENet/FENet.pkl'
+net = Disc(FENet_param_path).to(device)
+net_param_path = 'parameters/disc/dataset7_20epochs.pt'
+net.load_state_dict(torch.load(net_param_path))
 
 # initialize dataloader
 
-data_split_dir = 'data_split'
+dataset_dir = '../datasets/7'
+dataset_split_dir = '../datasets_splits/7'
 sample_rate = 16000
+
 # optimize dataloaders with GPU if available
+
 dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
-disc_dataset = AudioDataset(net_type='disc',
-                            data_split_dir=data_split_dir,
-                            sample_rate=sample_rate,
-                            mode='test')
-recon_dataset = AudioDataset(net_type='recon',
-                             data_split_dir=data_split_dir,
-                             sample_rate=sample_rate,
-                             mode='test')
-dataset = torch.utils.data.ConcatDataset([disc_dataset,recon_dataset])
+
+test_batch_size = 8
+
+dataset = AudioDataset(dataset_dir,
+                       dataset_split_dir,
+                       'test',
+                       sample_rate)
+    
 dataloader = torch.utils.data.DataLoader(dataset = dataset,
-                                         batch_size = 64,
+                                         batch_size = test_batch_size,
                                          shuffle = True,
                                          **dl_config)
 
-# test and show results
+# get labels and predictions
 
-metrics = test(net,'parameters/10_epochs_short_cough.pt',dataloader,device)
+labels,preds = test_epoch(net,dataloader,device)
 
-print('Testing results:')    
+# compute performance metrics and save them to a .csv file
+
+metrics_path = 'test_results/disc/dataset7_20epochs.csv'
+metrics = save_metrics(labels,preds,metrics_path)
+
+print('\nTesting results:')    
 print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
 print('Sensitivity/Recall: {:.3f}'.format(metrics['sensitivity']))
 print('Specificity: {:.3f}'.format(metrics['specificity']))
