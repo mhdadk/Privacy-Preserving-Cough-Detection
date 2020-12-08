@@ -1,0 +1,29 @@
+dataset3_20epochs.pt
+batch_size = 32,
+n_fft = 1024,
+n_mels = 128,
+hop_length = 64
+
+dataset4_20epochs.pt
+batch_size = 32,
+n_fft = 1024,
+n_mels = 128,
+hop_length = 64
+
+dataset5_20epochs.pt
+batch_size = 32,
+n_fft = 1024,
+n_mels = 128,
+hop_length = 64
+
+dataset6_20epochs.pt
+batch_size = 32,
+n_fft = 1024,
+n_mels = 128,
+hop_length = 64
+
+dataset7_20epochs.pt
+batch_size = 32,
+n_fft = 1024,
+n_mels = 128,
+hop_length = 64
