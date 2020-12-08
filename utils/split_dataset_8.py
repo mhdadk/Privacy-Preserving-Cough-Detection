@@ -3,6 +3,7 @@ import random
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import numpy as np
+import librosa
 
 src_dir = '../../datasets/1'
 dst_dir = '../../datasets_splits/8'
@@ -32,6 +33,13 @@ for label in os.listdir(src_dir):
     files = os.listdir(os.path.join(src_dir,label))
     subsample = random.sample(files,num_files)
     for file in subsample:
+        # if audio file is less than 1 second long, skip it and resample
+        # from the list of files. Keep doing this until the file is no
+        # longer less than 1 second long
+        duration = librosa.get_duration(filename=os.path.join(src_dir,label,file))
+        while duration < 1:
+            file = random.choice(files)
+            duration = librosa.get_duration(filename=os.path.join(src_dir,label,file))
         paths.append([os.path.join(label,file),label[0]])
 
 data = pd.DataFrame(paths)
