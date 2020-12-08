@@ -1,6 +1,14 @@
 import torch
-# this only works if disc.py is imported from another file
+"""
+if running this file independently, then use:
+
 from FENet import FENet
+
+else if importing this module from another file, then use:
+    
+from .FENet import FENet
+"""
+from .FENet import FENet
 
 class Disc(torch.nn.Module):
     
