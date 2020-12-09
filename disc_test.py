@@ -132,20 +132,20 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
-net_param_path = 'parameters/disc/dataset4_20epochs.pt'
+net_param_path = 'parameters/disc/dataset7_20epochs.pt'
 net.load_state_dict(torch.load(net_param_path))
 
 # initialize dataloader
 
-dataset_dir = '../datasets/4'
-dataset_split_dir = '../datasets_splits/4'
+dataset_dir = '../datasets/1'
+dataset_split_dir = '../datasets_splits/8'
 sample_rate = 16000
 
 # optimize dataloaders with GPU if available
 
 dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
 
-test_batch_size = 8
+test_batch_size = 1
 
 dataset = AudioDataset(dataset_dir,
                        dataset_split_dir,
@@ -163,7 +163,7 @@ labels,preds = test_epoch(net,dataloader,device)
 
 # compute performance metrics and save them to a .csv file
 
-metrics_path = 'test_results/disc/dataset4_20epochs.csv'
+metrics_path = 'test_results/disc/dataset8_5epochs.csv'
 metrics = save_metrics(labels,preds,metrics_path)
 
 print('\nTesting results:')    
