@@ -1,6 +1,4 @@
 *.asv
 *.wav
 *.pyc
-*.pkl
 *.pt
-*.csv
