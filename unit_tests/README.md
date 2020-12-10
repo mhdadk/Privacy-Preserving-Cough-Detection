@@ -1,0 +1,1 @@
+These files are used to test ideas before formalizing them into a function or class.
