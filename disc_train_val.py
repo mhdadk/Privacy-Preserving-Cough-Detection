@@ -152,12 +152,23 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
 
-# initialize datasets and dataloaders
+# number of epochs to train and validate for
 
-dataset_dir = '../datasets/1'
-dataset_split_dir = '../datasets_splits/8'
+num_epochs = 20
+
+# initialize datasets and dataloaders
+# dataset_num can be equal to 3,4,5,6,7, or 8 only
+
+dataset_num = 4
+dataset_dir = 'datasets/' + str(dataset_num if dataset_num != 8 else 1)
+dataset_split_dir = 'datasets_splits/' + str(dataset_num)
 sample_rate = 16000
 dataloaders = {}
+
+# where to save parameters in a .pt file
+
+pt_filename = 'dataset'+str(dataset_num)+'_'+str(num_epochs)+'epochs.pt'
+param_path = 'parameters/disc/' + pt_filename
 
 # optimize dataloaders with GPU if available
 
@@ -191,10 +202,6 @@ loss_func = torch.nn.BCEWithLogitsLoss(reduction = 'sum')
 
 optimizer = torch.optim.Adam(params = net.parameters(),
                              lr = 0.0003)
-
-# number of epochs to train and validate for
-
-num_epochs = 20
 
 # record the best validation accuracy across epochs
 
@@ -257,7 +264,7 @@ if __name__ == '__main__':
         if val_acc > best_val_acc:
             print('Saving checkpoint...')
             best_val_acc = val_acc
-            torch.save(net.state_dict(),'parameters/disc/dataset8_20epochs.pt')
+            torch.save(net.state_dict(),param_path)
         
     # show training and validation time and best validation accuracy
     
