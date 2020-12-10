@@ -1,0 +1,1 @@
+The parameter `.pt` file associated with the reconstruction network will be stored here.
