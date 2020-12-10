@@ -1,0 +1,1 @@
+Results of testing the discriminator network found in `../../models/disc.py` on the datasets found in `../../datasets`. Each file name has the format `datasetX_Yepochs.csv`, where `X` is the dataset number and `Y` is how many epochs the discriminator was trained for.
