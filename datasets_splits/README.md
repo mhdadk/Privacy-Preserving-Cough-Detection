@@ -1,0 +1,1 @@
+Please download the training, validation, and testing splits from [here](https://drive.google.com/file/d/1DciFsamCsnNrrKrk91Sh187qJ2zVGVa2/view?usp=sharing). These splits are stored in `csv` files so that results are reproducible. The folders `3,4,5,6,7,8` should be located here. Please refer to the `README.txt` file for an explanation of the folder names.
