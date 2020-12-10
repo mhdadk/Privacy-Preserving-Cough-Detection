@@ -1,1 +1,1 @@
- 
+ This is where the parameter `.pt` files are saved for the discriminator network during training and validation using the `../../disc_train_val.py` file.
