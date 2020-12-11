@@ -1,8 +1,13 @@
 import numpy as np
 
-# this is the long signal that contains coughs. Consecutive 0's followed by
-# consecutive 1's followed by consecutive 0's indicates a single cough.
-# Note also that this is a binary mask that will also be used for actual
-# signals
+# this is the long signal that contains coughs
 
-x = np.array([0,0,1,1,1,0,0,0,1,1,1,0,0])
+x = np.random.randn(15)
+
+# this is a binary mask that represents where coughs are located in the
+# long signal. This is similar to a bounding box in images. Consecutive
+# 0's followed by consecutive 1's followed by consecutive 0's indicates a
+# single cough
+
+y = np.array([0,0,1,1,1,0,0,0,1,1,1,0,0,0,0])
+
