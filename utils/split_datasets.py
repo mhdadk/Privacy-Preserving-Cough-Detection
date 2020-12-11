@@ -35,20 +35,20 @@ for dataset in os.listdir(datasets_dir):
                                            shuffle = True,
                                            stratify = data.iloc[:,1])
     
-    # ensure that ESC50 data is in training dataset and not validation
-    # or testing
+    # ensure that ESC50 and RESP data is in training dataset and not
+    # validation or testing
     
     for src_idx,filename,_ in data_val.itertuples(index=True,name=None):
-        # if not an ESC50 file, skip
-        if 'esc' not in filename:
+        # if not an ESC50 file or not a RESP file, skip
+        if 'esc' not in filename and 'resp' not in filename:
             continue
         # sample a random index from the training data
         dst_idx = np.random.choice(data_train.index)
-        # keep sampling to make sure that we are only switching ESC50 files
-        # in the val or test datasets with FSDKAGGLE2018 or RESP files in
-        # the training dataset to not affect the class split ratios
-        while ('fsd' not in data_train.loc[dst_idx][0] and
-               'resp' not in data_train.loc[dst_idx][0]):
+        # keep sampling to make sure that we are only switching ESC50 and
+        # RESP files in the val or test datasets with FSDKAGGLE2018 files
+        # in the training dataset to not affect the class split ratios
+        while ('esc' in data_train.loc[dst_idx][0] or
+               'resp' in data_train.loc[dst_idx][0]):
             dst_idx = np.random.choice(data_train.index)
         # once finished sampling, switch the files
         temp = data_val.loc[src_idx].copy()
@@ -59,6 +59,7 @@ for dataset in os.listdir(datasets_dir):
         # check that data_val no longer contains esc files
         print('-'*50)
         print('data_val contains ESC50 files? {}'.format(data_val[0].str.contains('esc').any()))
+        print('data_val contains RESP files? {}'.format(data_val[0].str.contains('resp').any()))
     
     data_val,data_test = train_test_split(data_val,
                                           train_size = 0.5,
