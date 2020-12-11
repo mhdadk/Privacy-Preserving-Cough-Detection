@@ -45,10 +45,9 @@ for dataset in os.listdir(datasets_dir):
         # sample a random index from the training data
         dst_idx = np.random.choice(data_train.index)
         # keep sampling to make sure that we are only switching ESC50 and
-        # RESP files in the val or test datasets with FSDKAGGLE2018 files
-        # in the training dataset to not affect the class split ratios
-        while ('esc' in data_train.loc[dst_idx][0] or
-               'resp' in data_train.loc[dst_idx][0]):
+        # RESP files in the val or test datasets with FSDKAGGLE2018 files in
+        # the training dataset to not affect the class split ratios
+        while 'FSD' not in data_train.loc[dst_idx][0]:
             dst_idx = np.random.choice(data_train.index)
         # once finished sampling, switch the files
         temp = data_val.loc[src_idx].copy()
@@ -87,7 +86,7 @@ for dataset in os.listdir(datasets_dir):
         print('\nNew class split ratios for dataset {}:'.format(dataset))
         
         for data_split,name in zip([data_train,data_val,data_test],
-                             ['train','val','test']):
+                                   ['train','val','test']):
             # other = 0
             # cough = 1
             # speech = 2
