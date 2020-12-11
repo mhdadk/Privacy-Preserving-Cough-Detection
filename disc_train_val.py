@@ -5,64 +5,14 @@ import time
 from models.disc import Disc
 from torch_datasets.AudioDataset import AudioDataset
 
-# helper functions
-
-def train_batch(net,x,labels,loss_func,optimizer,device):
+def run_batch(mode,net,x,labels,loss_func,optimizer,device):
     
     # move to GPU if available
     
     x = x.to(device)
     labels = labels.to(device).type_as(x) # needed for NLL
     
-    # compute log Mel spectrogram
-    
-    log = torchaudio.transforms.AmplitudeToDB().to(device)
-    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
-                                                    n_fft = 1024,
-                                                    n_mels = 128,
-                                                    hop_length = 64).to(device)
-    log_mel_spec = log(mel_spec(x))
-    
-    # logits must have same shape as labels
-    
-    logits = net(log_mel_spec).squeeze(dim = 1)
-    
-    # compute negative log-likelihood (NLL) using logits
-    
-    NLL = loss_func(logits,labels)
-    
-    # compute gradients of NLL with respect to parameters
-    
-    NLL.backward()
-    
-    # update parameters using these gradients. Minimizing the negative
-    # log-likelihood is equivalent to maximizing the log-likelihood
-    
-    optimizer.step()
-    
-    # zero the accumulated parameter gradients
-    
-    optimizer.zero_grad()
-    
-    # record predictions. since sigmoid(0) = 0.5, then negative values
-    # correspond to class 0 and positive values correspond to class 1
-    
-    preds = logits > 0
-    
-    # record correct predictions
-    
-    true_preds = torch.sum(preds == labels)
-    
-    return NLL.item(),true_preds.item()
-
-def val_batch(net,x,labels,loss_func,device):
-    
-    # move to GPU if available
-    
-    x = x.to(device)
-    labels = labels.to(device).type_as(x) # needed for NLL
-    
-    with torch.no_grad():
+    with torch.set_grad_enabled(mode == 'train'):
     
         # compute log Mel spectrogram
         
@@ -80,6 +30,21 @@ def val_batch(net,x,labels,loss_func,device):
         # compute negative log-likelihood (NLL) using logits
         
         NLL = loss_func(logits,labels)
+        
+        if mode == 'train':
+        
+            # compute gradients of NLL with respect to parameters
+            
+            NLL.backward()
+            
+            # update parameters using these gradients. Minimizing the negative
+            # log-likelihood is equivalent to maximizing the log-likelihood
+            
+            optimizer.step()
+            
+            # zero the accumulated parameter gradients
+            
+            optimizer.zero_grad()
     
     # record predictions. since sigmoid(0) = 0.5, then negative values
     # correspond to class 0 and positive values correspond to class 1
@@ -119,11 +84,8 @@ def run_epoch(mode,net,dataloader,optimizer,loss_func,device):
         
         # train or validate over the batch
         
-        if mode == 'train':
-            NLL,true_preds = train_batch(net,x,labels,loss_func,optimizer,
-                                         device)
-        else:
-            NLL,true_preds = val_batch(net,x,labels,loss_func,device)
+        NLL,true_preds = run_batch(mode,net,x,labels,loss_func,
+                                   optimizer,device)
         
         # record running statistics
         
