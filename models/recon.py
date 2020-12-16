@@ -67,6 +67,11 @@ if __name__ == '__main__':
     
     x = torch.rand(8,1,3000)
     
+    # zero mean and unit variance
+
+    x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
+                   x.std(dim = 2).unsqueeze(dim = -1))
+    
     """
     scale each signal to be between 0 and 1. This is equivalent to:
     
