@@ -14,7 +14,12 @@ op_params = []
 
 # example input
 
-x = torch.randn(batch_size,num_channels,int(length_sec * sample_rate))
+x = torch.rand(batch_size,num_channels,int(length_sec * sample_rate))
+
+# zero mean and unit variance
+
+x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
+               x.std(dim = 2).unsqueeze(dim = -1))
 
 """
 scale each signal to be between 0 and 1. This is equivalent to:
