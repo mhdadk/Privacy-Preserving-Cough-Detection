@@ -205,4 +205,4 @@ if __name__ == '__main__':
     end = time.time()
     total_time = time.strftime("%H:%M:%S",time.gmtime(end-start))
     print('\nTotal Time Elapsed (HH:MM:SS): ' + total_time)
-    print('Best Validation Loss: {:.2f}%'.format(best_val_loss))
+    print('Best Validation Loss: {:.2f}'.format(best_val_loss))
