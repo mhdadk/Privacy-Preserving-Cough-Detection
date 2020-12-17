@@ -35,7 +35,31 @@ pt_filename = 'dataset'+str(dataset_num)+'_'+str(num_epochs)+'epochs.pt'
 param_path = 'parameters/recon/' + pt_filename
 net.load_state_dict(torch.load(param_path))
 
-# sample an audio signal and reconstruct it
+# sample an audio signal
 
 idx = torch.randint(0,len(dataset),(1,)).item()
 x,label = dataset[idx]
+x = torch.unsqueeze(x, dim = 0)
+
+# preprocessing
+
+# zero mean and unit variance
+
+x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
+               x.std(dim = 2).unsqueeze(dim = -1))
+
+"""
+scale each signal to be between 0 and 1. This is equivalent to:
+
+y = {x / (x.max - x.min)} - {x.min / (x.max - x.min)}
+  = (1 / x.max - x.min) * (x - x.min)
+
+"""
+
+x = torch.multiply(torch.div(1,x.max(dim = 2)[0].unsqueeze(dim = -1) - 
+                               x.min(dim = 2)[0].unsqueeze(dim = -1)),
+                   x - x.min(dim = 2)[0].unsqueeze(dim = -1))
+
+# reconstruct the audio signal
+
+x_hat = net(x)
