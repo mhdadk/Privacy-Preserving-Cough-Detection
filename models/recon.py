@@ -1,4 +1,5 @@
 import torch
+from collections import OrderedDict
 
 class Autoencoder(torch.nn.Module):
     
@@ -8,53 +9,53 @@ class Autoencoder(torch.nn.Module):
         
         # encoder
         
-        conv1 = torch.nn.Conv1d(in_channels = 1,
-                                out_channels = 32,
-                                kernel_size = 32,
-                                stride = 1)
+        encoder = OrderedDict()
         
-        activation1 = torch.nn.SELU()
+        encoder['conv1'] = torch.nn.Conv1d(in_channels = 1,
+                                           out_channels = 32,
+                                           kernel_size = 32,
+                                           stride = 1)
         
-        pool1 = torch.nn.MaxPool1d(kernel_size = 2)
+        encoder['act1'] = torch.nn.SELU()
         
-        conv2 = torch.nn.Conv1d(in_channels = 32,
-                                out_channels = 56,
-                                kernel_size = 16,
-                                stride = 1)
+        encoder['out1'] = torch.nn.MaxPool1d(kernel_size = 2)
         
-        self.encoder = torch.nn.Sequential(conv1,
-                                           activation1,
-                                           pool1,
-                                           conv2,
-                                           activation1,
-                                           pool1)
+        encoder['conv2'] = torch.nn.Conv1d(in_channels = 32,
+                                           out_channels = 56,
+                                           kernel_size = 16,
+                                           stride = 1)
+        
+        encoder['act2'] = torch.nn.SELU()
+        
+        encoder['out2'] = torch.nn.MaxPool1d(kernel_size = 2)
+        
+        self.encoder = torch.nn.Sequential(encoder)
         
         # decoder
         
-        upsample1 = torch.nn.Upsample(scale_factor = 2,
+        decoder = OrderedDict()
+        
+        decoder['us1'] = torch.nn.Upsample(scale_factor = 2,
+                                           mode = 'nearest')
+        
+        decoder['conv3'] = torch.nn.Conv1d(in_channels = 56,
+                                           out_channels = 32,
+                                           kernel_size = 16,
+                                           stride = 1)
+        
+        decoder['out3'] = torch.nn.SELU()
+        
+        decoder['us2'] = torch.nn.Upsample(size = 3031,
                                       mode = 'nearest')
         
-        conv3 = torch.nn.Conv1d(in_channels = 56,
-                                out_channels = 32,
-                                kernel_size = 16,
-                                stride = 1)
+        decoder['conv4'] = torch.nn.Conv1d(in_channels = 32,
+                                           out_channels = 1,
+                                           kernel_size = 32,
+                                           stride = 1)
         
-        upsample2 = torch.nn.Upsample(size = 3031,
-                                      mode = 'nearest')
+        decoder['out4'] = torch.nn.Sigmoid()
         
-        conv4 = torch.nn.Conv1d(in_channels = 32,
-                                out_channels = 1,
-                                kernel_size = 32,
-                                stride = 1)
-        
-        activation2 = torch.nn.Sigmoid()
-        
-        self.decoder = torch.nn.Sequential(upsample1,
-                                           conv3,
-                                           activation1,
-                                           upsample2,
-                                           conv4,
-                                           activation2)
+        self.decoder = torch.nn.Sequential(decoder)
         
     def forward(self,x):
         x = self.encoder(x)
