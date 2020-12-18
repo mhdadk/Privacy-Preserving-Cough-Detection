@@ -3,6 +3,8 @@ import torch
 from models.recon import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
 
+from collections import OrderedDict
+
 # for reproducibility
 
 torch.manual_seed(42)
@@ -34,6 +36,21 @@ num_epochs = 20
 pt_filename = 'dataset'+str(dataset_num)+'_'+str(num_epochs)+'epochs.pt'
 param_path = 'parameters/recon/' + pt_filename
 net.load_state_dict(torch.load(param_path))
+
+# register forward hooks to record the output tensors from each layer
+
+layer_output = OrderedDict()
+
+def get_output(module_name):
+    def hook(module,input,output):
+        layer_output[module_name] = output.detach()
+    return hook
+
+for name, module in net.named_modules():
+    if 'out' in name:
+        parent, child = name.split('.')
+        net.__getattr__(parent).__getattr__(child).register_forward_hook(
+                                    get_output(name))
 
 # sample an audio signal
 
