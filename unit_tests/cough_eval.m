@@ -112,7 +112,7 @@ for idx = [i;j] % iterate through both i and j simultaneously
                 % length of cough inside window
                 length1 = m(2) - m(1) + 1;
                 % length of cough outside window
-                cough_start = find(cough_abs_start > window_start - window_length & ...
+                cough_start = find(cough_abs_start < window_start & ...
                                    cough_abs_end >= window_start,1,'last');
                 % if cough_start is empty, this means that the cough is
                 % completely in the window
@@ -134,7 +134,7 @@ for idx = [i;j] % iterate through both i and j simultaneously
             % length of cough inside window
             length1 = m(2) - m(1) + 1;
             % length of cough outside window
-            cough_end = find(cough_abs_end < window_end + window_length & ...
+            cough_end = find(cough_abs_end > window_end & ...
                              cough_abs_start <= window_end,1,'first');
             % if cough_end is empty, this means that the cough is
             % completely in the window
