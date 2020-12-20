@@ -2,7 +2,7 @@
 % 0's followed by 1's followed by 0's represents a cough
 
 % x = [0 0 0 0 1 1 1 1 0 0 0 1 1 1 0 0 0 1 1 1 1 1 0 0 0];
-x = [1 1 1 1 0 0 0 0 1 1 1 1 0 0 1 1 1 1];
+x = [1 1 1 1 1 1 0 0 0 0 0 0 0 1 1 1 1];
 
 % get the first and last indices of the coughs in the signal using edge
 % detection (first-order difference)
@@ -31,25 +31,31 @@ p = 0.5;
 preds = rand(num_windows,1);
 preds = preds < p;
 
-% indices used to slide window
+% used to record the window number
 
-i = 1 : step_size : length(x) - window_length;
+window_num = 0;
 
-% indices used to iterate through predictions
+% threshold used to determine the label for a window based on the maximum
+% ratio computed for the window
 
-j = 1:length(preds);
+threshold = 0.5;
 
-% to count the coughs
+% to accumulate prediction statistics and form a confusion matrix
 
-cough_num = 0;
+CM = struct('TP',0,...
+            'TN',0,...
+            'FP',0,...
+            'FN',0);
 
 % drop the last window if it is shorter than all other windows
 
-for idx = [i;j] % iterate through both i and j simultaneously
+for i = 1 : step_size : length(x) - window_length
+    
+    window_num = window_num + 1;
     
     % get first and last indices of window
     
-    window_start = idx(1); % same as i
+    window_start = i;
     window_end = window_start + window_length - 1;
     
     % extract the window
@@ -103,14 +109,17 @@ for idx = [i;j] % iterate through both i and j simultaneously
     precision is chosen.
     %}
     
-    for m = [cough_rel_start;cough_rel_end]
-        if m(1) == 1 % if cough at start of window
-            if m(2) == window_length % if cough covers entire window
+    % to find the maximum cough ratio in a window
+    
+    prev_ratio = 0;
+    
+    for j = [cough_rel_start;cough_rel_end] % iterate simultaneously
+        if j(1) == 1 % if cough at start of window
+            if j(2) == window_length % if cough covers entire window
                 ratio = 1;
-                break % no need to check other coughs
             else % if cough does not cover entire window
                 % length of cough inside window
-                length1 = m(2) - m(1) + 1;
+                length1 = j(2) - j(1) + 1;
                 % length of cough outside window
                 cough_start = find(cough_abs_start < window_start & ...
                                    cough_abs_end >= window_start,1,'last');
@@ -119,20 +128,21 @@ for idx = [i;j] % iterate through both i and j simultaneously
                 if isempty(cough_start)
                     ratio = 1;
                 % otherwise, compute total length of cough inside and outside
-                % the window
+                % the window and the corresponding ratio
                 else
                     length2 = window_start - cough_abs_start(cough_start);
                     % total length of cough
-                    length = length1 + length2;
+                    cough_length = length1 + length2;
                 
-                    ratio = length1 / length;
+                    ratio = max(length1 / cough_length, prev_ratio);
+                    prev_ratio = ratio;
                 end
             end
         % if cough starts somewhere in the window and ends at the end of
         % the window
-        elseif m(2) == window_length
+        elseif j(2) == window_length
             % length of cough inside window
-            length1 = m(2) - m(1) + 1;
+            length1 = j(2) - j(1) + 1;
             % length of cough outside window
             cough_end = find(cough_abs_end > window_end & ...
                              cough_abs_start <= window_end,1,'first');
@@ -141,13 +151,14 @@ for idx = [i;j] % iterate through both i and j simultaneously
             if isempty(cough_end)
                 ratio = 1;
             % otherwise, compute total length of cough inside and outside
-            % the window
+            % the window and the corresponding ratio
             else
                 length2 = cough_abs_end(cough_end) - window_end;
                 % total length of cough
-                length = length1 + length2;
+                cough_length = length1 + length2;
 
-                ratio = length1 / length;
+                ratio = max(length1 / cough_length, prev_ratio);
+                prev_ratio = ratio;
             end
         % if cough neither starts at the beginning of the window nor ends
         % at the end of the window, then it must be completely in the
@@ -155,6 +166,23 @@ for idx = [i;j] % iterate through both i and j simultaneously
         else
             ratio = 1;
         end
+    end
+    
+    % once the maximum ratio for the window is computed, compare it to a
+    % threshold to determine the label for the window
+    
+    window_label = ratio > threshold;
+    
+    % accumulate prediction statistics
+    
+    if preds(window_num) == 1 && window_label == 1 % true positive
+        CM.TP = CM.TP + 1;
+    elseif preds(window_num) == 1 && window_label == 0 % false positive
+        CM.FP = CM.FP + 1;
+    elseif preds(window_num) == 0 && window_label == 0 % true negative
+        CM.TN = CM.TN + 1;
+    elseif preds(window_num) == 0 && window_label == 1 % false negative
+        CM.FN = CM.FN + 1;
     end
 end
 
@@ -164,5 +192,6 @@ end
 function [cough_start,cough_end] = get_cough_locs(signal)
     locs = conv(signal,[1,-1],'full');
     cough_start = find(locs == 1);
+    % need the - 1 since filtered signal is delayed by 1 sample
     cough_end = find(locs == -1) - 1;
 end
