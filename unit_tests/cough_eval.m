@@ -2,7 +2,17 @@
 % 0's followed by 1's followed by 0's represents a cough
 
 % x = [0 0 0 0 1 1 1 1 0 0 0 1 1 1 0 0 0 1 1 1 1 1 0 0 0];
-x = [1 1 1 1 1 1 0 0 0 0 0 0 0 1 1 1 1];
+% x = [1 1 1 1 1 1 0 0 0 0 0 0 0 1 1 1 1];
+x = [1 1 0 0 1 1 0 0 0 0];
+
+% example 0,1 predictions by classifier for each overlapping window
+
+% p = 0.5;
+% preds = rand(num_windows,1);
+% preds = preds < p;
+% preds = [1,1,0,0,0,1];
+% preds = [0,1,];
+preds = [1];
 
 % get the first and last indices of the coughs in the signal using edge
 % detection (first-order difference)
@@ -24,12 +34,6 @@ step_size = window_length * (1 - overlap);
 % number of equally-sized overlapping windows
 
 num_windows = floor((length(x) - window_length) / step_size) + mod(length(x),step_size);
-
-% generate example 0,1 predictions by classifier
-
-p = 0.5;
-preds = rand(num_windows,1);
-preds = preds < p;
 
 % used to record the window number
 
@@ -65,6 +69,14 @@ for i = 1 : step_size : length(x) - window_length
     % get the relative indices of the coughs in the window
     
     [cough_rel_start,cough_rel_end] = get_cough_locs(window);
+    
+    % if there are no coughs in the window, then both cough_rel_start and
+    % cough_rel_end will be empty and the ratio is 0. Also, the following
+    % for loop will be skipped
+    
+    if isempty(cough_rel_start)
+        ratio = 0;
+    end
     
     %{
     for each cough in the window, compute the ratio of the intersection
@@ -127,6 +139,7 @@ for i = 1 : step_size : length(x) - window_length
                 % completely in the window
                 if isempty(cough_start)
                     ratio = 1;
+                    break % no need to check the other coughs
                 % otherwise, compute total length of cough inside and outside
                 % the window and the corresponding ratio
                 else
@@ -150,6 +163,7 @@ for i = 1 : step_size : length(x) - window_length
             % completely in the window
             if isempty(cough_end)
                 ratio = 1;
+                break % no need to check the other coughs
             % otherwise, compute total length of cough inside and outside
             % the window and the corresponding ratio
             else
@@ -165,6 +179,7 @@ for i = 1 : step_size : length(x) - window_length
         % window, which means that its ratio is 1
         else
             ratio = 1;
+            break % no need to check the other coughs
         end
     end
     
@@ -192,6 +207,7 @@ end
 function [cough_start,cough_end] = get_cough_locs(signal)
     locs = conv(signal,[1,-1],'full');
     cough_start = find(locs == 1);
-    % need the - 1 since filtered signal is delayed by 1 sample
+    % need the - 1 since filtered signal is delayed by 1 sample and a full
+    % convolution is used
     cough_end = find(locs == -1) - 1;
 end
