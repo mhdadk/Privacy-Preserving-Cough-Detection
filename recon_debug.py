@@ -107,14 +107,14 @@ optimizer = torch.optim.Adam(params = net.parameters(),
 
 # sample a batch and extract a batch of speech signals from it
 
-# batch = next(iter(dataloader))
-# speech_batch_size = 1
-# speech_batch = batch[0][torch.where(batch[1] == 2)[0]]
-# x = speech_batch[:speech_batch_size]
+batch = next(iter(dataloader))
+speech_batch_size = 10
+speech_batch = batch[0][torch.where(batch[1] == 2)[0]]
+x = speech_batch[:speech_batch_size]
 
-x,sr = torchaudio.load(filepath = '../ls_1_1.wav')
-x = torchaudio.transforms.Resample(sr,2000)(x)
-x = torch.mean(x,dim=0,keepdim=True).unsqueeze(0)
+# x,sr = torchaudio.load(filepath = '../ls_1_1.wav')
+# x = torchaudio.transforms.Resample(sr,2000)(x)
+# x = torch.mean(x,dim=0,keepdim=True).unsqueeze(0)
 
 # preprocessing
 
@@ -137,7 +137,7 @@ y = {x / (x.max - x.min)} - {x.min / (x.max - x.min)}
 
 # number of times to train on the batch
 
-num_epochs = 300
+num_epochs = 1000
 
 # overfit on the batch
 
@@ -155,8 +155,8 @@ import sounddevice as sd
 # x_hat = torch.sigmoid(x_hat)
 
 plt.subplot(2,1,1)
-plt.plot(x[0].squeeze().detach().numpy())
+plt.plot(x[2].squeeze().detach().numpy())
 plt.subplot(2,1,2)
-plt.plot(x_hat[0].squeeze().detach().numpy())
+plt.plot(x_hat[2].squeeze().detach().numpy())
 
 # sd.play(x_hat[0].squeeze().detach().numpy(),2000)
