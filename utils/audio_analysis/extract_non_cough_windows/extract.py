@@ -79,7 +79,7 @@ def get_stats(x,sr,frame_sample_length=0.064):
 # where audio files are stored and where audio snippets should be written
 
 src_dir = '../../../../datasets/1'
-dst_dir = '../../../../datasets/7'
+dst_dir = '../../../../datasets/8'
 # src_dir = '../../data_archive/data_uncropped/speech'
 # files = os.listdir(src_dir)
 # dst_dir = '../../data/speech_cropped'
@@ -91,18 +91,13 @@ rng = np.random.default_rng()
 
 # how long snippets should be in seconds
 
-snippet_length = 3.0
+snippet_length = 1.5
 
 for dataset in os.listdir(src_dir):
-    if dataset == 'COUGH':
+    if dataset == '1_COUGH':
         continue
     
     for file in os.listdir(os.path.join(src_dir,dataset)):
-        
-        # to ensure balanced data
-        
-        if len(os.listdir(os.path.join(dst_dir,dataset))) >= 206:
-            break
         
         # get the total length of the audio file
         
@@ -140,7 +135,7 @@ for dataset in os.listdir(src_dir):
         # successfully been admitted and written to disk. Otherwise, stop
         # searching if 100 iterations pass
         
-        while (num_passed < 3 and loop_count < 100):
+        while (num_passed < 5 and loop_count < 100):
             
             # while loop counter
             
