@@ -142,8 +142,9 @@ num_epochs = 1000
 # overfit on the batch
 
 for epoch in range(num_epochs):
-    recon_loss = run_batch('train',net,x,loss_func,optimizer,device)
-    print(recon_loss)
+    for signal in x:
+        recon_loss = run_batch('train',net,signal.unsqueeze(0),loss_func,optimizer,device)
+        print(recon_loss)
 
 # reconstruct the batch and plot a sample
 
@@ -155,8 +156,8 @@ import sounddevice as sd
 # x_hat = torch.sigmoid(x_hat)
 
 plt.subplot(2,1,1)
-plt.plot(x[2].squeeze().detach().numpy())
+plt.plot(x[0].squeeze().detach().numpy())
 plt.subplot(2,1,2)
-plt.plot(x_hat[2].squeeze().detach().numpy())
+plt.plot(x_hat[0].squeeze().detach().numpy())
 
 # sd.play(x_hat[0].squeeze().detach().numpy(),2000)
