@@ -44,13 +44,24 @@ CM = struct('TP',0,...
             'FP',0,...
             'FN',0);
 
-% iterate over cough indices
+% iterate over windows
 
-for idx = [cough_start ; cough_end]
-    % find the windows that intersect with the cough
-    window_idx = find(idx(1) < window_end & idx(2) > window_start);
-    for window = [window_start(window_idx) ; window_end(window_idx)]
-        
+for window = [window_start ; window_end]
+    % to record the maximum ratio
+    prev_ratio = 0;
+    % find the coughs that intersect with the window
+    cough_idx = find(cough_start <= window(2) & cough_end >= window(1));
+    % iterate over the coughs that intersect with the window
+    for cough = [cough_start(cough_idx) ; cough_end(cough_idx)]
+        % compute intersection length
+        lower = max(window(1),cough(1));
+        upper = min(window(2),cough(2));
+        % guaranteed that upper >= lower
+        intersection_length = upper - lower + 1;
+        % compute ratio
+        ratio = max(intersection_length / (cough(2) - cough(1) + 1),...
+                    prev_ratio);
+        prev_ratio = ratio;
     end
 end
 
