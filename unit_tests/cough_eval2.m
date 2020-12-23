@@ -28,7 +28,7 @@ step_size = window_length * (1 - overlap);
 window_num = 0;
 
 % threshold used to determine the label for a window based on the maximum
-% ratio computed for the window
+% intersection ratio computed for the window
 
 threshold = 0.5;
 
@@ -88,17 +88,15 @@ for i = 1 : step_size : length(x) - window_length + 1
     window_num = window_num + 1;
     % to record the maximum intersection ratio
     prev_ratio = 0;
-    % find the coughs that intersect with the window
-    cough_idx = find(cough_end >= i & ...
-                     cough_start <= i + window_length - 1);
-    % iterate over the coughs that intersect with the window
-    for cough = [cough_start(cough_idx) ; cough_end(cough_idx)]
+    % iterate over each cough to check if it intersects with the window
+    for cough = [cough_start ; cough_end]
         % compute intersection length
-        lower = max(cough(1),i);
-        upper = min(cough(2),i + window_length - 1);
-        % guaranteed that upper >= lower
+        lower = max(cough(1), i);
+        upper = min(cough(2), i + window_length - 1);
         intersection_length = upper - lower + 1;
-        % compute maximum intersection ratio
+        % compute maximum intersection ratio. If intersection_length is
+        % negative because upper < lower, then since prev_ratio = 0, then
+        % ratio = 0
         ratio = max(intersection_length / (cough(2) - cough(1) + 1),...
                     prev_ratio);
         prev_ratio = ratio;
