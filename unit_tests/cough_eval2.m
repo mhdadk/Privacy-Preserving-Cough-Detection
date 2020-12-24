@@ -93,10 +93,16 @@ for i = 1 : step_size : length(x) - window_length + 1
         % compute intersection length
         lower = max(cough(1), i);
         upper = min(cough(2), i + window_length - 1);
-        intersection_length = upper - lower + 1;
+        % if lower > upper, then there is no intersection between the
+        % cough and the window, so intersection_length = 0
+        if lower <= upper
+            intersection_length = upper - lower + 1;
+        else
+            intersection_length = 0;
+        end
         % compute maximum intersection ratio. If intersection_length is
-        % negative because upper < lower, then since prev_ratio = 0, then
-        % ratio = 0
+        % negative because upper < lower, then there is no intersection
+        % between the cough and the window, and so ratio = 0
         ratio = max(intersection_length / (cough(2) - cough(1) + 1),...
                     prev_ratio);
         prev_ratio = ratio;
