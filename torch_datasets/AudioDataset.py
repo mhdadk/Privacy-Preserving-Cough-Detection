@@ -35,7 +35,7 @@ class AudioDataset(torch.utils.data.Dataset):
         # load audio file and its sample rate
         
         path = os.path.join(self.dataset_dir,self.paths.iloc[idx,0])
-        path = path.replace("\","/")
+        path = path.replace("\\",'/')
         x,sr = torchaudio.load(filepath = path)
         
         # resample to self.sample_rate
