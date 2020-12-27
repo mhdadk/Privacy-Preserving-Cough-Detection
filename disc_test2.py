@@ -100,7 +100,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
-net_param_path = 'parameters/disc/dataset4_20epochs.pt'
+net_param_path = 'parameters/disc/dataset9_20epochs.pt'
 net.load_state_dict(torch.load(net_param_path,map_location=torch.device('cpu')))
 
 # where long audio signals containing coughs are located
