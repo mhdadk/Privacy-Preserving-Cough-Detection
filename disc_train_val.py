@@ -121,7 +121,7 @@ num_epochs = 20
 # initialize datasets and dataloaders
 # dataset_num can be equal to 3,4,5,6,7, or 8 only
 
-dataset_num = 4
+dataset_num = 9
 dataset_dir = '../datasets/' + str(dataset_num if dataset_num != 8 else 1)
 dataset_split_dir = '../datasets_splits/' + str(dataset_num)
 sample_rate = 16000
