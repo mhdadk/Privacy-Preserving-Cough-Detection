@@ -142,7 +142,7 @@ using a threshold, and accumulating prediction statistics to form
 a confusion matrix for all the windows for all files
 """
 
-threshold = 1
+threshold = 0.5
 
 # to accumulate prediction statistics and form a confusion matrix
 
@@ -223,7 +223,8 @@ for i,(filename,cough_locs) in enumerate(cough_timestamps.items()):
         
         # classifier prediction for window
         
-        pred = test_batch(x.unsqueeze(0),new_sr,net,device)
+        pred = test_batch(x[0,j:j+window_length].unsqueeze(0).unsqueeze(0),
+                          new_sr,net,device)
         
         # accumulate prediction statistics
         
