@@ -134,12 +134,12 @@ param_path = 'parameters/disc/' + pt_filename
 
 # optimize dataloaders with GPU if available
 
-dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
+dl_config = {'num_workers': 2, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 1
-val_batch_size = 1
+train_batch_size = 64
+val_batch_size = 64
 
 for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
