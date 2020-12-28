@@ -54,7 +54,7 @@ net.load_state_dict(torch.load(net_param_path,map_location=torch.device('cpu')))
 
 # where long audio signals containing coughs are located
 
-filepath = '../datasets/1/1_COUGH/audioset_101.wav'
+filepath = '../datasets/1/1_COUGH/fsd_44.wav'
 
 # sample rate to use
 
@@ -129,7 +129,7 @@ for j in range(0, x.shape[1] - window_length + 1, step_size):
     
     # iterate over each cough to check if it intersects with the window
     
-    for cough_start,cough_end in cough_timestamps['audioset_101.wav']:
+    for cough_start,cough_end in cough_timestamps['fsd_44.wav']:
         
         # compute intersection length
         
