@@ -139,7 +139,7 @@ for window_length in window_lengths:
             
             for i,row in enumerate(cough_ts_reader):
                 
-                print('\rCompleted: {} files'.format((i+1)),
+                print('\rProcessed {} files'.format((i+1)),
                       end='',flush=True)
                 
                 # get the length of the audio file in seconds
@@ -211,7 +211,7 @@ for window_length in window_lengths:
             
             for i,file in enumerate(dataset.iterdir()):
                 
-                print('\rCompleted: {} files'.format((i+1)),
+                print('\rProcessed {} files'.format((i+1)),
                       end='',flush=True)
                 
                 # get the length of the audio file in seconds
