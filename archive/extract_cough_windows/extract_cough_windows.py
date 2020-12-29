@@ -7,11 +7,9 @@ import numpy as np
 # NOTE: audioset_77_3.wav and fsd_169_5.wav are longer than 1 second,
 # so they were removed from the csv file
 
-src_dir = '../../../../datasets/1/1_COUGH'
-dst_dir = '../../../../datasets/8/1_COUGH'
+src_dir = '../../../../data/raw/1_COUGH'
+dst_dir = '../../../../data'
 sample_rate = 16000
-
-# lengths = np.zeros((1118,))
 
 fp = open('cough_timestamps.csv')
 csv_reader = csv.reader(fp,delimiter=',')
