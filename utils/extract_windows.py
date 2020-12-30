@@ -165,7 +165,7 @@ for window_length in window_lengths:
                 # get the length of the audio file in seconds
                 
                 split_filename = str(row[0]).split('_')
-                # TODO: remove this
+                # TODO for testing
                 if (int(split_filename[1]) > 50 or
                     'esc' in split_filename[0] or
                     'fsd' in split_filename[0]):
@@ -364,7 +364,7 @@ for window_length in window_lengths:
     since there are more FSDKAGGLE2018 files than both ESC50 and RESP files
     combined, then this will not be a problem    
     """
-    
+    #%%
     # if data_train contains fsd files
     if data_train[0].str.contains('fsd').any():
         # find the indices of fsd files in data_train
@@ -373,25 +373,29 @@ for window_length in window_lengths:
         val_idx = data_val[0][data_val[0].str.contains('esc|resp')].index
         # iterate over the esc and resp file indices in data_val. For this
         # to work properly, len(train_idx) >= len(val_idx) must be true
-        for src_idx in val_idx:
-            # if not an ESC50 file or not a RESP file, skip
-            # if 'esc' not in row[1] and 'resp' not in row[1]:
-            #     continue
-            # sample a random index of an fsd file in data_train
-            sample = rng.integers(0,len(train_idx))
-            dst_idx = train_idx[sample]
-            # remove the sampled index so that it is not sampled again
-            train_idx = train_idx.delete(sample)
-            # # repeated sampling
-            # while 'fsd' not in data_train.loc[dst_idx][0]:
-            #     dst_idx = np.random.choice(data_train.index)
-            # switch the files
-            temp = data_val.loc[src_idx].copy()
-            data_val.loc[src_idx] = data_train.loc[dst_idx].copy()
-            data_train.loc[dst_idx] = temp
-            # if train_idx is empty after sampling all indices, break
-            if len(train_idx) == 0:
-                break
+        if len(train_idx) >= len(val_idx):
+            for src_idx in val_idx:
+                # if not an ESC50 file or not a RESP file, skip
+                # if 'esc' not in row[1] and 'resp' not in row[1]:
+                #     continue
+                # sample a random index of an fsd file in data_train
+                sample = rng.integers(0,len(train_idx))
+                dst_idx = train_idx[sample]
+                # remove the sampled index so that it is not sampled again
+                train_idx = train_idx.delete(sample)
+                # # repeated sampling
+                # while 'fsd' not in data_train.loc[dst_idx][0]:
+                #     dst_idx = np.random.choice(data_train.index)
+                # switch the files
+                temp = data_val.loc[src_idx].copy()
+                data_val.loc[src_idx] = data_train.loc[dst_idx].copy()
+                data_train.loc[dst_idx] = temp
+                # if train_idx is empty after sampling all indices, break
+                if len(train_idx) == 0:
+                    break
+        else:
+            print('\nCould not remove all ESC50 and RESP files from ' \
+                  'validation and testing data.')
     
     if verbose:
         # check that data_val no longer contains esc files
