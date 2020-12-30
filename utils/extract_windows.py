@@ -90,7 +90,7 @@ window_lengths = [1.0, 1.5, 2.0, 2.5, 3.0]
 
 # number of windows to extract per cough
 
-num_windows = 30
+num_windows = 35
 
 # whether to show train, val, and test ratios and class split ratios
 
