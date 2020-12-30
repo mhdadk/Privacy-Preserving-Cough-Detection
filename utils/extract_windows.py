@@ -82,11 +82,7 @@ def get_stats(x,sr,frame_sample_length=0.064):
 
 # where the raw data is located
 
-data_dir = pathlib.Path('../../data/raw_test')
-
-# new sample rate to resample audio to in Hz
-
-new_sr = 16000
+data_dir = pathlib.Path('../../data/raw')
 
 # how long extracted windows should be in seconds
 
@@ -165,11 +161,11 @@ for window_length in window_lengths:
                 # get the length of the audio file in seconds
                 
                 split_filename = str(row[0]).split('_')
-                # TODO for testing
-                if (int(split_filename[1]) > 50 or
-                    'esc' in split_filename[0] or
-                    'fsd' in split_filename[0]):
-                    continue
+                # for testing
+                # if (int(split_filename[1]) > 50 or
+                #     'esc' in split_filename[0] or
+                #     'fsd' in split_filename[0]):
+                #     continue
                 file = dataset / (split_filename[0]+'_'+split_filename[1]+row[0].suffix)
                 file_length = librosa.get_duration(filename = str(file))
                 
@@ -236,7 +232,7 @@ for window_length in window_lengths:
                     # store the metadata
                     
                     path = pathlib.Path(dataset.name,file.name).as_posix()
-                    data.append([path,new_sr,start,start + window_length])
+                    data.append([path,start,start + window_length])
                         
             fp_cough_ts.close()
         
@@ -326,7 +322,7 @@ for window_length in window_lengths:
                         # store the metadata
                         
                         path = pathlib.Path(dataset.name,file.name).as_posix()
-                        data.append([path,new_sr,start,start + window_length])
+                        data.append([path,start,start + window_length])
     
     print('\n\nSplitting data...')            
     
@@ -364,7 +360,7 @@ for window_length in window_lengths:
     since there are more FSDKAGGLE2018 files than both ESC50 and RESP files
     combined, then this will not be a problem    
     """
-    #%%
+    
     # if data_train contains fsd files
     if data_train[0].str.contains('fsd').any():
         # find the indices of fsd files in data_train
