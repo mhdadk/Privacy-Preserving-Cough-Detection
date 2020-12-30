@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 import csv
 
 import numpy as np
@@ -81,7 +82,7 @@ def get_stats(x,sr,frame_sample_length=0.064):
 
 # where the raw data is located
 
-data_dir = pathlib.Path('../../data/raw')
+data_dir = pathlib.Path('../../data/raw_test')
 
 # new sample rate to resample audio to in Hz
 
@@ -110,7 +111,7 @@ rng = np.random.default_rng()
 
 for window_length in window_lengths:
     
-    print('\nProcessing window of length {} seconds'.format(window_length))
+    print('\nProcessing windows of length {} seconds'.format(window_length))
     
     # to store the processing instructions for the data
     
@@ -119,6 +120,18 @@ for window_length in window_lengths:
     # where the processed data will be stored in csv format
 
     dst_dir = data_dir.parent / (str(window_length).replace('.','-') + 's')
+    
+    """
+    if the folders 1-0s, 1-5s,..., 3-0s already exist, then delete them
+    and re-create them to start from scratch. Otherwise, create these
+    folders
+    """
+    
+    if dst_dir.exists():
+        shutil.rmtree(dst_dir) # delete non-empty directories
+        dst_dir.mkdir() # create the folder
+    else:
+        dst_dir.mkdir()
     
     # csv file containing timestamps of coughs
 
@@ -132,6 +145,10 @@ for window_length in window_lengths:
         
         print('\nDataset: {}'.format(dataset))
         
+        # to count the number of processed files
+
+        num_processed = 0
+        
         """
         if analyzing the 1_COUGH dataset, then extract <num_windows> windows
         of length <window_length> seconds that contain the coughs 
@@ -139,15 +156,21 @@ for window_length in window_lengths:
         
         if 'COUGH' in str(dataset):
             
-            for i,row in enumerate(cough_ts_reader):
+            for row in cough_ts_reader:
                 
-                print('\rProcessed {} files'.format((i+1)),
-                      end='',flush=True)
+                # convert path to pathlib.Path object for easier handling
                 
+                row[0] = pathlib.Path(row[0])
+            
                 # get the length of the audio file in seconds
                 
-                split_filename = row[0].split('_')
-                file = dataset / (split_filename[0]+'_'+split_filename[1]+'.wav')
+                split_filename = str(row[0]).split('_')
+                # TODO: remove this
+                if (int(split_filename[1]) > 50 or
+                    'esc' in split_filename[0] or
+                    'fsd' in split_filename[0]):
+                    continue
+                file = dataset / (split_filename[0]+'_'+split_filename[1]+row[0].suffix)
                 file_length = librosa.get_duration(filename = str(file))
                 
                 # compute the length of the cough in seconds
@@ -155,51 +178,59 @@ for window_length in window_lengths:
                 cough_length = float(row[2]) - float(row[1])
                 
                 """
-                if the entire audio file is not at least as long as twice
-                the length of the window to be extracted, skip the audio
-                file. Also, if the length of the cough is greater than the
-                length of the window to be extracted, skip this cough
+                if the entire audio file is not at least as long as 1.5
+                times the length of the window to be extracted, skip the
+                audio file. Also, if the length of the cough is greater
+                than the length of the window to be extracted, skip this
+                cough
                 """
                 
-                if (file_length < 2 * window_length or
+                if (file_length < 1.5 * window_length or
                     cough_length > window_length):
                     continue
+                
+                # track progress
+                
+                num_processed += 1                
+                print('\rProcessed {} files'.format(num_processed),
+                      end='',flush=True)                
+                
+                """
+                given the signal:
+                    
+                  !       $         *       ^
+                0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 0    
+                
+                Where 0's represent non-cough and 1's represent a cough, the 
+                extracted window must be 10 samples long, and the $ symbol
+                represents the first sample of the cough, then a 10-sample
+                window can start from the 2nd sample (!) of the signal and end
+                at the last sample of the cough (*), or it can start from the
+                1st sample of the cough ($) and end at the 15th sample of the
+                signal (^).
+                
+                The 10-sample window can range anywhere from these two
+                extremes, with the condition that the window contain 100% of
+                the cough.
+                
+                The start variable below is a uniformly random sample of the
+                starting time of the window that can range from the ! sample,
+                which is equal to the * sample minus the window length, to the
+                starting sample of the cough, denoted by $. Note, however, that
+                since the difference between * and the window length can be
+                negative, then the max operator is needed to keep this
+                difference greater than or equal to 0            
+                """
+                
+                low = max(0,float(row[2]) - window_length)
+                high = float(row[1])
                 
                 # extract <num_windows> windows around this cough
                 
                 for _ in range(num_windows):
-                
-                    """
-                    given the signal:
-                        
-                      !       $         *       ^
-                    0 0 0 0 0 1 1 1 1 1 1 0 0 0 0 0 0    
-                    
-                    Where 0's represent non-cough and 1's represent a cough, the 
-                    extracted window must be 10 samples long, and the $ symbol
-                    represents the first sample of the cough, then a 10-sample
-                    window can start from the 2nd sample (!) of the signal and end
-                    at the last sample of the cough (*), or it can start from the
-                    1st sample of the cough ($) and end at the 15th sample of the
-                    signal (^).
-                    
-                    The 10-sample window can range anywhere from these two
-                    extremes, with the condition that the window contain 100% of
-                    the cough.
-                    
-                    The start variable below is a uniformly random sample of the
-                    starting time of the window that can range from the ! sample,
-                    which is equal to the * sample minus the window length, to the
-                    starting sample of the cough, denoted by $. Note, however, that
-                    since the difference between * and the window length can be
-                    negative, then the max operator is needed to keep this
-                    difference greater than or equal to 0            
-                    """
                     
                     # sample a random starting time for the window
                     
-                    low = max(0,float(row[2]) - window_length)
-                    high = float(row[1])
                     start = rng.uniform(low = low, high = high)
                     
                     # store the metadata
@@ -211,10 +242,7 @@ for window_length in window_lengths:
         
         else:
             
-            for i,file in enumerate(dataset.iterdir()):
-                
-                print('\rProcessed {} files'.format((i+1)),
-                      end='',flush=True)
+            for file in dataset.iterdir():
                 
                 # get the length of the audio file in seconds
                 
@@ -228,7 +256,13 @@ for window_length in window_lengths:
             
                 if file_length < 1.5 * window_length:
                     continue
-            
+                
+                # track progress
+                
+                num_processed += 1                
+                print('\rProcessed {} files'.format(num_processed),
+                      end='',flush=True)
+                
                 # number of windows that have been admitted
             
                 num_passed = 0
@@ -294,7 +328,7 @@ for window_length in window_lengths:
                         path = pathlib.Path(dataset.name,file.name).as_posix()
                         data.append([path,new_sr,start,start + window_length])
     
-    print('\nSplitting data...')            
+    print('\n\nSplitting data...')            
     
     data = pd.DataFrame(data)
     
@@ -306,28 +340,62 @@ for window_length in window_lengths:
                                            shuffle = True,
                                            stratify = data[0].str[0].astype(int))
     
-    # ensure that ESC50 and RESP data is in training dataset and not
-    # validation or testing
+    """
+    ensure that ESC50 and RESP data is in training dataset and not
+    validation or testing.
     
-    for row in data_val.itertuples(index=True,name=None):
-        # if not an ESC50 file or not a RESP file, skip
-        if 'esc' not in row[1] and 'resp' not in row[1]:
-            continue
-        # sample a random index from the training data
-        dst_idx = np.random.choice(data_train.index)
-        # keep sampling to make sure that we are only switching ESC50 and
-        # RESP files in the val or test datasets with FSDKAGGLE2018 files in
-        # the training dataset to not affect the class split ratios
-        while 'FSD' not in data_train.loc[dst_idx][0]:
-            dst_idx = np.random.choice(data_train.index)
-        # once finished sampling, switch the files
-        temp = data_val.loc[row[0]].copy()
-        data_val.loc[row[0]] = data_train.loc[dst_idx].copy()
-        data_train.loc[dst_idx] = temp
+    This is done by first iterating through data_val, checking if each file
+    is an ESC50 or RESP file. If not, the file is skipped. Otherwise,
+    randomly sample a file from data_train to be switched with the ESC50
+    or RESP file in data_val. If the file that was sampled from data_train
+    is already an ESC50 or RESP file, then sample again. Repeat this until
+    the randomly sampled file is no longer a ESC50 or RESP file. However, 
+    to maintain the desired class split ratios, the sampled file cannot be
+    a COUGH or LIBRISPEECH file either.
+    
+    Therefore, the sampled file must be a FSDKAGGLE2018 file. However,
+    if there are no FSDKAGGLE2018 files in data_train, then switching
+    the ESC50 or RESP file in data_val with a file in data_train will not
+    be possible. That is what the if statement is for.
+    
+    Additionally, it is possible that there are more ESC50 or RESP files
+    in data_val than there are FSDKAGGLE2018 files in data_train. In this
+    case, there will be ESC50 or RESP files leftover in data_val. However,
+    since there are more FSDKAGGLE2018 files than both ESC50 and RESP files
+    combined, then this will not be a problem    
+    """
+    
+    # if data_train contains fsd files
+    if data_train[0].str.contains('fsd').any():
+        # find the indices of fsd files in data_train
+        train_idx = data_train[0][data_train[0].str.contains('fsd')].index
+        # find the indices of esc and resp files in data_val
+        val_idx = data_val[0][data_val[0].str.contains('esc|resp')].index
+        # iterate over the esc and resp file indices in data_val. For this
+        # to work properly, len(train_idx) >= len(val_idx) must be true
+        for src_idx in val_idx:
+            # if not an ESC50 file or not a RESP file, skip
+            # if 'esc' not in row[1] and 'resp' not in row[1]:
+            #     continue
+            # sample a random index of an fsd file in data_train
+            sample = rng.integers(0,len(train_idx))
+            dst_idx = train_idx[sample]
+            # remove the sampled index so that it is not sampled again
+            train_idx = train_idx.delete(sample)
+            # # repeated sampling
+            # while 'fsd' not in data_train.loc[dst_idx][0]:
+            #     dst_idx = np.random.choice(data_train.index)
+            # switch the files
+            temp = data_val.loc[src_idx].copy()
+            data_val.loc[src_idx] = data_train.loc[dst_idx].copy()
+            data_train.loc[dst_idx] = temp
+            # if train_idx is empty after sampling all indices, break
+            if len(train_idx) == 0:
+                break
     
     if verbose:
         # check that data_val no longer contains esc files
-        print('data_val contains ESC50 files? {}'.format(data_val[0].str.contains('esc').any()))
+        print('\ndata_val contains ESC50 files? {}'.format(data_val[0].str.contains('esc').any()))
         print('data_val contains RESP files? {}'.format(data_val[0].str.contains('resp').any()))
     
     data_val,data_test = train_test_split(data_val,
@@ -343,25 +411,26 @@ for window_length in window_lengths:
         print('\nNumber of files per class:')
         
         for label in ['0','1','2']:
-            print('{} class = {} files'.format(label,
-                                               sum(data[0].str[0] == label)))
+            num_files = sum(data[0].str[0] == label)
+            print('{} class = {} files'.format(label,num_files))
         
         # show train, val, test split ratios
         
-        print('\nData split ratios:')
+        print('\nData split percentages:')
         
         for data_split,name in zip([data_train,data_val,data_test],
                                    ['train','val','test']):
-            print('{} ratio = {}'.format(name,len(data_split)/len(data)))
+            percentage = len(data_split)/len(data)*100
+            print('{} percentage = {:.2f}%'.format(name,percentage))
         
         # show train, val, test class split ratios to verify stratification
         
-        print('\nOriginal class split ratios:')
+        print('\nOriginal class percentages:')
         for label in ['0','1','2']:
-            print('{} class ratio = {}'.format(label,
-                                               sum(data[0].str[0] == label)/len(data)))
+            percentage = sum(data[0].str[0] == label)/len(data)*100
+            print('{} class percentage = {:.2f}%'.format(label,percentage))
         
-        print('\nNew class split ratios:')
+        print('\nNew class split percentages:')
         
         for data_split,name in zip([data_train,data_val,data_test],
                                    ['train','val','test']):
@@ -369,17 +438,13 @@ for window_length in window_lengths:
             # cough = 1
             # speech = 2
             for label in ['0','1','2']:
-                print('{} {} ratio = {}'.format(label,name,
-                                                sum(data_split[0].str[0] == label)/len(data_split)))
-        
-        print('-'*40)
-    
-    # create the folders 1-0s, 1-5s,..., 3-0s if they do not already exist
-    
-    if not dst_dir.exists():
-        dst_dir.mkdir()
+                percentage = sum(data_split[0].str[0] == label)/len(data_split)*100
+                print('{} {} percentage = {:.2f}%'.format(label,name,percentage))
     
     # write the training, validation, and testing data to csv
+    
+    print('\nWriting csv files...')
+    print('-'*40)
     
     data_train.to_csv(str(dst_dir / 'data_train.csv'),
                       header = False,
