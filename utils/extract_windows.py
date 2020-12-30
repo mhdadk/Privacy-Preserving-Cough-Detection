@@ -102,13 +102,15 @@ verbose = True
 # turn off SettingWithCopyWarning. default is 'warn'. Just in case,
 # this should be set to 'warn' during testing
 
-# pd.options.mode.chained_assignment = None
+pd.options.mode.chained_assignment = None
 
 # initialize random number generator
 
 rng = np.random.default_rng()
 
 for window_length in window_lengths:
+    
+    print('\nProcessing window of length {} seconds'.format(window_length))
     
     # to store the processing instructions for the data
     
@@ -325,7 +327,6 @@ for window_length in window_lengths:
     
     if verbose:
         # check that data_val no longer contains esc files
-        print('-'*50)
         print('data_val contains ESC50 files? {}'.format(data_val[0].str.contains('esc').any()))
         print('data_val contains RESP files? {}'.format(data_val[0].str.contains('resp').any()))
     
@@ -337,9 +338,17 @@ for window_length in window_lengths:
     
     if verbose:
         
+        # number of files per class
+        
+        print('\nNumber of files per class:')
+        
+        for label in ['0','1','2']:
+            print('{} class = {} files'.format(label,
+                                               sum(data[0].str[0] == label)))
+        
         # show train, val, test split ratios
         
-        print('\nData split ratios for dataset {}:'.format(dataset))
+        print('\nData split ratios:')
         
         for data_split,name in zip([data_train,data_val,data_test],
                                    ['train','val','test']):
@@ -347,12 +356,12 @@ for window_length in window_lengths:
         
         # show train, val, test class split ratios to verify stratification
         
-        print('\nOriginal class split ratios for dataset {}:'.format(dataset))
+        print('\nOriginal class split ratios:')
         for label in ['0','1','2']:
             print('{} class ratio = {}'.format(label,
                                                sum(data[0].str[0] == label)/len(data)))
         
-        print('\nNew class split ratios for dataset {}:'.format(dataset))
+        print('\nNew class split ratios:')
         
         for data_split,name in zip([data_train,data_val,data_test],
                                    ['train','val','test']):
@@ -362,6 +371,8 @@ for window_length in window_lengths:
             for label in ['0','1','2']:
                 print('{} {} ratio = {}'.format(label,name,
                                                 sum(data_split[0].str[0] == label)/len(data_split)))
+        
+        print('-'*40)
     
     # create the folders 1-0s, 1-5s,..., 3-0s if they do not already exist
     
