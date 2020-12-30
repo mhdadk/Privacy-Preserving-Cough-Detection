@@ -394,7 +394,7 @@ for window_length in window_lengths:
                 if len(train_idx) == 0:
                     break
         else:
-            print('\nCould not remove all ESC50 and RESP files from ' \
+            print('\nCould not remove all ESC50 and RESP files from ' +
                   'validation and testing data.')
     
     if verbose:
