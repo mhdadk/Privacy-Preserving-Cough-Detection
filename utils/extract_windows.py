@@ -259,10 +259,10 @@ for window_length in window_lengths:
                 print('\rProcessed {} files'.format(num_processed),
                       end='',flush=True)
                 
-                # number of windows that have been admitted
+                # number of windows to be admitted
             
                 num_passed = 0
-            
+                
                 """
                 sometimes, only 1 or 2 short sounds exist in a long audio file.
                 In this case, stop searching after <iter_count> iterations has
@@ -276,7 +276,10 @@ for window_length in window_lengths:
                 windows have successfully been admitted
                 """
                 
-                max_passed = 5
+                if 'LIBRISPEECH' in str(dataset):
+                    max_passed = 2
+                else:
+                    max_passed = 5
                 
                 while (num_passed < max_passed and iter_count < 100):
                     
