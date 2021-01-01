@@ -36,8 +36,10 @@ iterate over each of balanced_train_segments.csv,
 unbalanced_train_segments.csv, and eval_segments.csv
 """
 
+start_epoch = time.time()
+
 for csv_file in metadata_dir.iterdir():
-    print('Reading {}...'.format(csv_file.name))
+    print('\nReading {}...'.format(csv_file.name))
     # start reading csv file
     fp = open(csv_file)
     csv_reader = csv.reader(fp,
@@ -47,7 +49,7 @@ for csv_file in metadata_dir.iterdir():
     for _ in range(3):
         next(csv_reader)
     # start iterating from 4th row
-    for row in csv_reader:
+    for i,row in enumerate(csv_reader):
         # YouTube video ID of audio snippet
         yt_id = row[0]
         # start time of audio snippet in seconds
@@ -182,54 +184,49 @@ for csv_file in metadata_dir.iterdir():
                            'copy',
                            str(dst)]
         
-        try:
+            try:
+                
+                # execute command in cmd.exe using ffmpeg.exe
+                
+                ffmpeg_out1 = subprocess.run(args = ffmpeg_cmd1,
+                                             capture_output = True,
+                                             encoding = 'utf-8',
+                                             check = True)
+            
+            except subprocess.CalledProcessError:
+                # audio cannot be downloaded
+                continue
+        
+            # convert downloaded .m4a file to a .wav file
+            
+            ffmpeg_cmd2 = ['ffmpeg',
+                           '-i',
+                           str(dst),
+                           str(dst.with_suffix('.wav'))
+                           ]
             
             # execute command in cmd.exe using ffmpeg.exe
-            
-            ffmpeg_out1 = subprocess.run(args = ffmpeg_cmd1,
+                
+            ffmpeg_out2 = subprocess.run(args = ffmpeg_cmd2,
                                          capture_output = True,
                                          encoding = 'utf-8',
                                          check = True)
-        
-        except subprocess.CalledProcessError:
-            # audio cannot be downloaded
-            continue
-        
-        # convert downloaded .m4a file to a .wav file
-        
-        ffmpeg_cmd2 = ['ffmpeg',
-                       '-i',
-                       str(dst),
-                       str(dst.with_suffix('.wav'))
-                       ]
-        
-        # execute command in cmd.exe using ffmpeg.exe
             
-        ffmpeg_out2 = subprocess.run(args = ffmpeg_cmd2,
-                                     capture_output = True,
-                                     encoding = 'utf-8',
-                                     check = True)
-        
-        # delete the .m4a file as it is no longer needed
-        
-        dst.unlink()
-        
-        # track progress
-        
-        num_downloaded += 1                
-        print('\rDownloaded {} files'.format(num_downloaded),
-              end='',flush=True) 
-        
-        # close ffmpeg.exe once finished
-        
-        misc_out = subprocess.run(args = ['taskkill','/IM','ffmpeg.exe'],
-                                  capture_output = True,
-                                  encoding = 'utf-8',
-                                  check = True)
+            # delete the .m4a file as it is no longer needed
+            
+            dst.unlink()
+            
+            # track progress
+            
+            num_downloaded += 1                
+            print('\rRow {}, Downloaded {} files'.format((i+1),
+                                                         num_downloaded),
+                  end='',flush=True)
     
-    # end = time.time()
-    
-    # print('Time elapsed: {}'.format(time.strftime(
-    #                                 "%H:%M:%S",time.gmtime(end-start))))
-        
     fp.close()
+
+end_epoch = time.time()
+
+print('\nTime elapsed: {}'.format(time.strftime(
+                                  "%H:%M:%S",time.gmtime(end_epoch-
+                                                         start_epoch))))
