@@ -183,7 +183,7 @@ for csv_file in metadata_dir.iterdir():
                            '-c',
                            'copy',
                            str(dst)]
-        
+            
             try:
                 
                 # execute command in cmd.exe using ffmpeg.exe
@@ -205,12 +205,21 @@ for csv_file in metadata_dir.iterdir():
                            str(dst.with_suffix('.wav'))
                            ]
             
-            # execute command in cmd.exe using ffmpeg.exe
-                
-            ffmpeg_out2 = subprocess.run(args = ffmpeg_cmd2,
-                                         capture_output = True,
-                                         encoding = 'utf-8',
-                                         check = True)
+            try:
+            
+                # execute command in cmd.exe using ffmpeg.exe
+                    
+                ffmpeg_out2 = subprocess.run(args = ffmpeg_cmd2,
+                                             capture_output = True,
+                                             encoding = 'utf-8',
+                                             check = True)
+            
+            except subprocess.CalledProcessError:
+                # audio cannot be converted from .m4a to .wav format, so
+                # delete the downloaded .m4a file and skip to the next
+                # row
+                dst.unlink()
+                continue
             
             # delete the .m4a file as it is no longer needed
             
