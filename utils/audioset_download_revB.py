@@ -131,7 +131,7 @@ for csv_file in metadata_dir.iterdir():
                                           encoding = 'utf-8',
                                           check = True)
             
-            except subprocess.CalledProcessError:
+            except: #subprocess.CalledProcessError:
                 # audio URL cannot be obtained
                 continue
         
@@ -193,7 +193,7 @@ for csv_file in metadata_dir.iterdir():
                                              encoding = 'utf-8',
                                              check = True)
             
-            except subprocess.CalledProcessError:
+            except: #subprocess.CalledProcessError:
                 # audio cannot be downloaded
                 continue
         
@@ -214,7 +214,7 @@ for csv_file in metadata_dir.iterdir():
                                              encoding = 'utf-8',
                                              check = True)
             
-            except subprocess.CalledProcessError:
+            except: #subprocess.CalledProcessError:
                 # audio cannot be converted from .m4a to .wav format, so
                 # delete the downloaded .m4a file and skip to the next
                 # row
