@@ -90,7 +90,7 @@ window_lengths = [1.0, 1.5, 2.0, 2.5, 3.0]
 
 # number of windows to extract per cough
 
-num_windows = 35
+num_windows = 100
 
 # whether to show train, val, and test ratios and class split ratios
 
@@ -125,9 +125,8 @@ for window_length in window_lengths:
     
     if dst_dir.exists():
         shutil.rmtree(dst_dir) # delete non-empty directories
-        dst_dir.mkdir() # create the folder
-    else:
-        dst_dir.mkdir()
+    
+    dst_dir.mkdir() # create the folder
     
     # csv file containing timestamps of coughs
 
@@ -139,7 +138,7 @@ for window_length in window_lengths:
     
     for dataset in data_dir.iterdir():
         
-        print('\nDataset: {}'.format(dataset))
+        print('\nDataset: {}'.format(dataset.name))
         
         # to count the number of processed files
 
@@ -279,7 +278,7 @@ for window_length in window_lengths:
                 if 'LIBRISPEECH' in str(dataset):
                     max_passed = 2
                 else:
-                    max_passed = 5
+                    max_passed = 2
                 
                 while (num_passed < max_passed and iter_count < 100):
                     
