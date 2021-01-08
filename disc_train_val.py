@@ -119,17 +119,16 @@ net = Disc(FENet_param_path).to(device)
 num_epochs = 20
 
 # initialize datasets and dataloaders
-# dataset_num can be equal to 3,4,5,6,7, or 8 only
 
-dataset_num = 9
-dataset_dir = '../datasets/' + str(dataset_num if dataset_num != 8 else 1)
-dataset_split_dir = '../datasets_splits/' + str(dataset_num)
+raw_data_dir = '../data/raw'
+window_length = 1.5 # seconds
 sample_rate = 16000
 dataloaders = {}
 
 # where to save parameters in a .pt file
 
-pt_filename = 'dataset'+str(dataset_num)+'_'+str(num_epochs)+'epochs.pt'
+pt_filename = (str(window_length).replace('.','-') + 's' + 
+               '_' + str(num_epochs) + 'epochs.pt')
 param_path = 'parameters/disc/' + pt_filename
 
 # optimize dataloaders with GPU if available
@@ -138,16 +137,13 @@ dl_config = {'num_workers': 2, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 64
-val_batch_size = 64
+train_batch_size = 4
+val_batch_size = 4
 
 for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
     
-    dataset = AudioDataset(dataset_dir,
-                           dataset_split_dir,
-                           mode,
-                           sample_rate)
+    dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode)
     
     dataloaders[mode] = torch.utils.data.DataLoader(
                                dataset = dataset,
