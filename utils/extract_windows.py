@@ -90,7 +90,18 @@ window_lengths = [1.0, 1.5, 2.0, 2.5, 3.0]
 
 # number of windows to extract per cough
 
-num_windows = 100
+num_windows = 105
+
+"""
+for non-cough windows,start randomly searching for snippets until
+<max_passed> windows have successfully been admitted
+"""
+
+max_passed = {'0_AUDIOSET':3,
+              '0_ESC50':2,
+              '0_FSDKAGGLE2018':2,
+              '0_RESP':2,
+              '2_LIBRISPEECH':2}
 
 # whether to show train, val, and test ratios and class split ratios
 
@@ -186,7 +197,6 @@ for window_length in window_lengths:
                 
                 # track progress
                 
-                num_processed += 1                
                 print('\rProcessed {} files'.format(num_processed),
                       end='',flush=True)                
                 
@@ -214,15 +224,21 @@ for window_length in window_lengths:
                 starting sample of the cough, denoted by $. Note, however, that
                 since the difference between * and the window length can be
                 negative, then the max operator is needed to keep this
-                difference greater than or equal to 0            
+                difference greater than or equal to 0
+                
+                Also, to avoid windows that are less than <window_length>
+                seconds, the min operator is needed for the end time of
+                the window
                 """
                 
                 low = max(0,float(row[2]) - window_length)
-                high = float(row[1])
+                high = min(float(row[1]),file_length - window_length)
                 
                 # extract <num_windows> windows around this cough
                 
                 for _ in range(num_windows):
+                    
+                    num_processed += 1
                     
                     # sample a random starting time for the window
                     
@@ -254,7 +270,6 @@ for window_length in window_lengths:
                 
                 # track progress
                 
-                num_processed += 1                
                 print('\rProcessed {} files'.format(num_processed),
                       end='',flush=True)
                 
@@ -269,18 +284,9 @@ for window_length in window_lengths:
                 """
                 
                 iter_count = 0
-            
-                """
-                start randomly searching for snippets until <max_passed> 
-                windows have successfully been admitted
-                """
                 
-                if 'LIBRISPEECH' in str(dataset):
-                    max_passed = 2
-                else:
-                    max_passed = 2
-                
-                while (num_passed < max_passed and iter_count < 100):
+                while (num_passed < max_passed[dataset.name] and 
+                       iter_count < 100):
                     
                     iter_count += 1
                     
@@ -316,6 +322,8 @@ for window_length in window_lengths:
                     """
                     
                     if rms_mean > 0.035 or entropy_mean < 6.0:
+                        
+                        num_processed += 1
                         
                         # 1 more window is successfully admitted
                         
