@@ -1,46 +1,72 @@
-import os
+import pathlib
 import torch
 import torchaudio
 import pandas as pd
 
 class AudioDataset(torch.utils.data.Dataset):
     
-    def __init__(self,dataset_dir,dataset_split_dir,mode,sample_rate,
+    def __init__(self,raw_data_dir,window_length,sample_rate,mode,
                  map_labels = True):
         
-        # path to dataset
+        # path to raw data folder
         
-        self.dataset_dir = dataset_dir
+        self.raw_data_dir = pathlib.Path(raw_data_dir)
         
-        # file paths are in the first column, while the corresponding label
-        # is in the second column
+        """
+        given the desired <window_length> and the <mode>, the
+        corresponding csv file is read. Each row of the csv file has the
+        following format:
         
-        self.paths = pd.read_csv(os.path.join(dataset_split_dir,
-                                              'data_'+mode+'.csv'),
-                                 header = None)
+        A/B,C,D
+        
+        Where:
+        - A is the dataset name (0_AUDIOSET,1_COUGH,...)
+        - B is the file name
+        - C is the start time of the window in seconds
+        - D is the end time of the window in seconds
+        """
+        
+        csv_path = pathlib.Path(self.raw_data_dir.parent,
+                                str(window_length).replace('.','-') + 's',
+                                'data_'+mode+'.csv')
+        self.metadata = pd.read_csv(csv_path,header = None)
         
         # what sampling rate to resample audio to
         
-        self.sample_rate = sample_rate
+        self.new_sr = sample_rate
         
-        # whether to map labels to be cough and non-cough
+        # whether to map labels to be cough and non-cough only and not
+        # cough, speech, and other
         
         self.map_labels = map_labels
     
     def __len__(self):
-        return len(self.paths)
+        return len(self.metadata)
         
     def __getitem__(self,idx):
         
-        # load audio file and its sample rate
+        """
+        load audio file. Since the torchaudio.load() function requires
+        the <num_frames> and <offset> parameters to load a window of the
+        audio file, then we first need to compute the location of the
+        starting sample of the window and the length of the window using
+        the sample rate. This sample rate is obtained using the
+        torchaudio.info() function
+        """
         
-        path = os.path.join(self.dataset_dir,self.paths.iloc[idx,0])
-        path = path.replace("\\",'/')
-        x,sr = torchaudio.load(filepath = path)
+        path = self.raw_data_dir / self.metadata.iloc[idx,0]
+        start_sec = self.metadata.iloc[idx,1]
+        end_sec = self.metadata.iloc[idx,2]
+        sr = torchaudio.info(filepath = path)[0].rate
+        start = round(sr * start_sec)
+        length = round(sr * (end_sec - start_sec))
+        x = torchaudio.load(filepath = path,
+                            offset = start,
+                            num_frames = length)[0]
         
         # resample to self.sample_rate
         
-        x = torchaudio.transforms.Resample(sr,self.sample_rate)(x)
+        x = torchaudio.transforms.Resample(sr,self.new_sr)(x)
         
         # convert to mono
         
@@ -48,7 +74,7 @@ class AudioDataset(torch.utils.data.Dataset):
         
         # get audio signal label and map it to cough and non-cough labels
         
-        label = self.paths.iloc[idx,1]
+        label = int(self.metadata.iloc[idx,0][0])
         if self.map_labels and label == 2:
             label = 0
         
@@ -60,11 +86,11 @@ if __name__ == '__main__':
     import sounddevice as sd
     import random
     
-    dataset_dir = '../../datasets/3'
-    dataset_split_dir = '../../datasets_splits/3'
-    mode = 'train'
+    raw_data_dir = '../../data/raw'
+    window_length = 1.5 # seconds
     sample_rate = 16000
-    dataset = AudioDataset(dataset_dir,dataset_split_dir,mode,sample_rate)
+    mode = 'train'
+    dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode)
     
     idx = random.randint(0,len(dataset))
     x,label = dataset[idx]
