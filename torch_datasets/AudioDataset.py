@@ -57,7 +57,7 @@ class AudioDataset(torch.utils.data.Dataset):
         path = self.raw_data_dir / self.metadata.iloc[idx,0]
         start_sec = self.metadata.iloc[idx,1]
         end_sec = self.metadata.iloc[idx,2]
-        sr = torchaudio.info(filepath = path)[0].rate
+        sr = torchaudio.info(filepath = str(path))[0].rate
         start = round(sr * start_sec)
         length = round(sr * (end_sec - start_sec))
         x = torchaudio.load(filepath = path,
