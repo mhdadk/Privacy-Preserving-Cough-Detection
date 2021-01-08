@@ -116,7 +116,7 @@ net = Disc(FENet_param_path).to(device)
 
 # number of epochs to train and validate for
 
-num_epochs = 20
+num_epochs = 5
 
 # initialize datasets and dataloaders
 
