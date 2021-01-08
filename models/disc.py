@@ -28,7 +28,7 @@ class Disc(torch.nn.Module):
             param.requires_grad = False
             
         # initialize logistic regression
-            
+        
         self.fc1 = torch.nn.Linear(
             in_features = self.feature_extractor.stage7[0].out_channels,
             out_features = 1)
