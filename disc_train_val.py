@@ -121,7 +121,7 @@ num_epochs = 20
 # initialize datasets and dataloaders
 
 raw_data_dir = '../data/raw'
-window_length = 1.5 # seconds
+window_length = 1.0 # seconds
 sample_rate = 16000
 dataloaders = {}
 
@@ -133,12 +133,12 @@ param_path = 'parameters/disc/' + pt_filename
 
 # optimize dataloaders with GPU if available
 
-dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
+dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 4
-val_batch_size = 4
+train_batch_size = 16
+val_batch_size = 16
 
 for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
