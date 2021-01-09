@@ -3,7 +3,6 @@ import csv
 
 import torch
 import torchaudio
-from sklearn.metrics import confusion_matrix
 
 from models.disc import Disc
 
