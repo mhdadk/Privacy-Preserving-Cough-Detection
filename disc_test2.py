@@ -1,4 +1,4 @@
-import os
+import pathlib
 import csv
 
 import torch
@@ -100,12 +100,12 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
-net_param_path = 'parameters/disc/dataset9_20epochs.pt'
-net.load_state_dict(torch.load(net_param_path,map_location=torch.device('cpu')))
+net_param_path = 'parameters/disc/1-0s_5epochs.pt'
+net.load_state_dict(torch.load(net_param_path,map_location=device))
 
 # where long audio signals containing coughs are located
 
-data_dir = '../datasets/1/1_COUGH'
+data_dir = pathlib.Path('../datasets/1/1_COUGH')
 
 # sample rate to use
 
@@ -113,8 +113,7 @@ new_sr = 16000
 
 # where cough timestamps are located
 
-cough_timestamps_path = 'utils/audio_analysis/extract_cough_windows/' + \
-                        'cough_timestamps.csv'
+cough_timestamps_path = 'utils/cough_timestamps.csv'
 
 # store the first and last cough sample numbers
 
@@ -165,11 +164,11 @@ for i,(filename,cough_locs) in enumerate(cough_timestamps.items()):
     
     # filepath
     
-    path = os.path.join(data_dir,filename)
+    path = data_dir / filename
     
     # load the audio signal
     
-    x,old_sr = torchaudio.load(filepath = path)
+    x,old_sr = torchaudio.load(filepath = str(path))
     
     # resample to new_sr Hz
     
