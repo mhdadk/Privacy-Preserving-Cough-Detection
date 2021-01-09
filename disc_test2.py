@@ -237,7 +237,7 @@ for i,(filename,cough_locs) in enumerate(cough_timestamps.items()):
 # compute performance metrics and save them to a .csv file
 
 metrics_path = 'test_results/disc/1-0s_5epochs.csv'
-metrics = save_metrics(labels,preds,metrics_path)
+metrics = save_metrics(CM,metrics_path)
 
 print('\nTesting results:')    
 print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
