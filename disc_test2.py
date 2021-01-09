@@ -103,7 +103,7 @@ net.load_state_dict(torch.load(net_param_path,map_location=device))
 
 # where long audio signals containing coughs are located
 
-data_dir = pathlib.Path('../datasets/1/1_COUGH')
+data_dir = pathlib.Path('../data/raw/1_COUGH')
 
 # sample rate to use
 
