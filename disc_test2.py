@@ -7,16 +7,15 @@ from sklearn.metrics import confusion_matrix
 
 from models.disc import Disc
 
-def save_metrics(labels,preds,metrics_path):
+def save_metrics(CM,metrics_path):
     
     fp = open(metrics_path,mode='w')
     csv_writer = csv.writer(fp,delimiter=',',lineterminator='\n')
     
-    CM = confusion_matrix(labels,preds,labels=[0,1])
-    TP = CM[1,1]
-    TN = CM[0,0]
-    FP = CM[0,1]
-    FN = CM[1,0]
+    TP = CM['TP']
+    FP = CM['FP']
+    TN = CM['TN']
+    FN = CM['FN']
     sensitivity = TP/(TP+FN) # true positive rate (TPR)
     csv_writer.writerow(['Sensitivity/Recall','{:.3f}'.format(sensitivity)])
     specificity = TN/(TN+FP) # true negative rate (TNR)
@@ -236,16 +235,17 @@ for i,(filename,cough_locs) in enumerate(cough_timestamps.items()):
         elif pred == 0 and window_label == 1: # false negative
             CM['FN'] += 1
 
-# compute prediction statistics
+# compute performance metrics and save them to a .csv file
 
-TP = CM['TP']
-FP = CM['FP']
-TN = CM['TN']
-FN = CM['FN']
-sensitivity = TP/(TP+FN) # true positive rate (TPR) or recall
-specificity = TN/(TN+FP) # true negative rate (TNR)
-accuracy = (TP+TN)/(TP+TN+FP+FN)
-balanced_accuracy = (sensitivity+specificity)/2
-MCC = (TP*TN - FP*FN)/(((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**0.5)
-PPV = TP/(TP+FP) # precision
-NPV = TN/(TN+FN)
+metrics_path = 'test_results/disc/1-0s_5epochs.csv'
+metrics = save_metrics(labels,preds,metrics_path)
+
+print('\nTesting results:')    
+print('\nConfusion Matrix:\n{}\n'.format(metrics['CM']))
+print('Sensitivity/Recall: {:.3f}'.format(metrics['sensitivity']))
+print('Specificity: {:.3f}'.format(metrics['specificity']))
+print('Accuracy: {:.3f}'.format(metrics['acc']))
+print('Balanced Accuracy: {:.3f}'.format(metrics['bal_acc']))
+print('Matthews correlation coefficient: {:.3f}'.format(metrics['MCC']))
+print('Precision/PPV: {:.3f}'.format(metrics['precision']))
+print('NPV: {:.3f}'.format(metrics['NPV']))
