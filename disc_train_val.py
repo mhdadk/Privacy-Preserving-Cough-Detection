@@ -121,7 +121,7 @@ num_epochs = 5
 # initialize datasets and dataloaders
 
 raw_data_dir = '../data/raw'
-window_length = 1.0 # seconds
+window_length = 1.5 # seconds
 sample_rate = 16000
 dataloaders = {}
 
@@ -137,8 +137,8 @@ dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 16
-val_batch_size = 16
+train_batch_size = 64 #16
+val_batch_size = 64 #16
 
 for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
