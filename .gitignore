@@ -2,3 +2,4 @@
 *.wav
 *.pyc
 *.pt
+test_results/*
