@@ -15,28 +15,28 @@ def save_metrics(CM,metrics_path):
     FP = CM['FP']
     TN = CM['TN']
     FN = CM['FN']
-    sensitivity = TP/(TP+FN) # true positive rate (TPR)
+    sensitivity = TP/(TP+FN+1e-10) # true positive rate (TPR)
     csv_writer.writerow(['Sensitivity/Recall','{:.3f}'.format(sensitivity)])
-    specificity = TN/(TN+FP) # true negative rate (TNR)
+    specificity = TN/(TN+FP+1e-10) # true negative rate (TNR)
     csv_writer.writerow(['Specificity','{:.3f}'.format(specificity)])
-    accuracy = (TP+TN)/(TP+TN+FP+FN)
+    accuracy = (TP+TN)/(TP+TN+FP+FN+1e-10)
     csv_writer.writerow(['Accuracy','{:.3f}'.format(accuracy)])
     balanced_accuracy = (sensitivity+specificity)/2
     csv_writer.writerow(['Balanced accuracy','{:.3f}'.format(balanced_accuracy)])
     
     # Matthews correlation coefficient
     
-    MCC = (TP*TN - FP*FN)/(((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**0.5)
+    MCC = (TP*TN - FP*FN)/(((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**0.5+1e-10)
     csv_writer.writerow(['Matthews correlation coefficient','{:.3f}'.format(MCC)])
         
     # positive predictive value (or precision)
     
-    PPV = TP/(TP+FP)
+    PPV = TP/(TP+FP+1e-10)
     csv_writer.writerow(['Precision/PPV','{:.3f}'.format(PPV)])
     
     # negative predictive value
     
-    NPV = TN/(TN+FN)
+    NPV = TN/(TN+FN+1e-10)
     csv_writer.writerow(['NPV','{:.3f}'.format(NPV)])
     
     # close csv file after writing
@@ -98,7 +98,8 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
-net_param_path = 'parameters/disc/1-0s_5epochs.pt'
+window_length = 1.0 # seconds
+net_param_path = 'parameters/disc/{}_5epochs.pt'.format(str(window_length).replace('.','-')+'s')
 net.load_state_dict(torch.load(net_param_path,map_location=device))
 
 # where long audio signals containing coughs are located
@@ -130,7 +131,9 @@ for row in csv_reader:
     else:
         cough_timestamps[filename] = [[cough_start,cough_end]]
     prev_filename = filename
-    
+
+fp.close()
+
 """
 given the locations of the coughs in the files, iterate through each
 file while sliding an overlapping window, recording the prediction for
@@ -149,10 +152,9 @@ CM = {'TP':0,
       'FN':0}
 
 # size of sliding window
-    
-window_length = 1.5 # seconds
+
 window_length = int(new_sr * window_length) # samples
-overlap = 2/3 # fraction of window_length
+overlap = 2/3 # fraction of window_length overlap
 step_size = int(window_length * (1 - overlap))
 
 for i,(filename,cough_locs) in enumerate(cough_timestamps.items()):
@@ -236,7 +238,7 @@ for i,(filename,cough_locs) in enumerate(cough_timestamps.items()):
 
 # compute performance metrics and save them to a .csv file
 
-metrics_path = 'test_results/disc/1-0s_5epochs.csv'
+metrics_path = 'test_results/disc/{}_5epochs.csv'.format(str(window_length).replace('.','-')+'s')
 metrics = save_metrics(CM,metrics_path)
 
 print('\nTesting results:')    
