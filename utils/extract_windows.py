@@ -97,6 +97,9 @@ for non-cough windows,start randomly searching for snippets until
 <max_passed> windows have successfully been admitted
 """
 
+# TODO: change these such that |0_AUDIOSET| is equal to the size of
+# all others when augmented, but also equal to size of 1_COUGH
+
 max_passed = {'0_AUDIOSET':3,
               '0_ESC50':2,
               '0_FSDKAGGLE2018':2,
