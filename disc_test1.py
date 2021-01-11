@@ -132,28 +132,25 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
-net_param_path = 'parameters/disc/dataset7_20epochs.pt'
-net.load_state_dict(torch.load(net_param_path))
+window_length = 1.0 # seconds
+net_param_path = 'parameters/disc/{}_5epochs.pt'.format(str(window_length).replace('.','-')+'s')
+net.load_state_dict(torch.load(net_param_path,map_location=device))
 
 # initialize dataloader
 
-dataset_dir = '../datasets/1'
-dataset_split_dir = '../datasets_splits/8'
+raw_data_dir = '../data/raw'
 sample_rate = 16000
 
 # optimize dataloaders with GPU if available
 
-dl_config = {'num_workers': 0, 'pin_memory': True} if use_cuda else {}
+dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
-test_batch_size = 1
+dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'test')
 
-dataset = AudioDataset(dataset_dir,
-                       dataset_split_dir,
-                       'test',
-                       sample_rate)
-    
+batch_size = 64
+
 dataloader = torch.utils.data.DataLoader(dataset = dataset,
-                                         batch_size = test_batch_size,
+                                         batch_size = batch_size,
                                          shuffle = True,
                                          **dl_config)
 
@@ -163,7 +160,7 @@ labels,preds = test_epoch(net,dataloader,device)
 
 # compute performance metrics and save them to a .csv file
 
-metrics_path = 'test_results/disc/dataset8_5epochs.csv'
+metrics_path = 'test_results/disc/{}_5epochs.csv'.format(str(window_length).replace('.','-')+'s')
 metrics = save_metrics(labels,preds,metrics_path)
 
 print('\nTesting results:')    
