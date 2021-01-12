@@ -80,9 +80,119 @@ def get_stats(x,sr,frame_sample_length=0.064):
     
     return frames_rms_mean,frames_entropy_mean
 
+# turn off SettingWithCopyWarning. default is 'warn'. Just in case,
+# this should be set to 'warn' during testing
+
+pd.options.mode.chained_assignment = None
+
+# initialize random number generator
+
+rng_seed = 42
+rng = np.random.default_rng(seed = rng_seed)
+
 # where the raw data is located
 
 data_dir = pathlib.Path('../../data/raw')
+
+# load paths
+
+paths = []
+
+for label in data_dir.iterdir():
+    for file in label.iterdir():
+        paths.append('{}/{}'.format(file.parent.name,file.name))
+
+paths = pd.Series(paths)
+
+# load cough timestamps
+
+cough_timestamps = {}
+fp = open('cough_timestamps.csv')
+csv_reader = csv.reader(fp,delimiter=',')
+prev_filename = ''
+
+for row in csv_reader:
+    file1,file2,_ = row[0].split('_')
+    filename = file1 + '_' + file2 + '.wav'
+    cough_start = float(row[1])
+    cough_end = float(row[2])
+    if prev_filename == filename:
+        cough_timestamps[filename].append([cough_start,cough_end])
+    else:
+        cough_timestamps[filename] = [[cough_start,cough_end]]
+    prev_filename = filename
+
+fp.close()
+
+# split paths
+
+paths_train,paths_val = train_test_split(paths,
+                                         train_size = 0.8,
+                                         random_state = rng_seed,
+                                         shuffle = True,
+                                         stratify = paths.str[0].astype(int))
+
+"""
+ensure that ESC50 and RESP data is in training dataset and not
+validation or testing.
+
+This is done by first iterating through paths_val, checking if each file
+is an ESC50 or RESP file. If not, the file is skipped. Otherwise,
+randomly sample a file from paths_train to be switched with the ESC50
+or RESP file in paths_val. If the file that was sampled from paths_train
+is already an ESC50 or RESP file, then sample again. Repeat this until
+the randomly sampled file is no longer a ESC50 or RESP file. However, 
+to maintain the desired class split ratios, the sampled file cannot be
+a COUGH or LIBRISPEECH file either.
+
+Therefore, the sampled file must be a FSDKAGGLE2018 file. However,
+if there are no FSDKAGGLE2018 files in paths_train, then switching
+the ESC50 or RESP file in paths_val with a file in paths_train will not
+be possible. That is what the if statement is for.
+
+Additionally, it is possible that there are more ESC50 or RESP files
+in paths_val than there are FSDKAGGLE2018 files in paths_train. In this
+case, there will be ESC50 or RESP files leftover in paths_val. However,
+since there are more FSDKAGGLE2018 files than both ESC50 and RESP files
+combined, then this will not be a problem    
+"""
+
+# if paths_train contains fsd files
+if paths_train.str.contains('fsd').any():
+    # find the indices of fsd files in paths_train
+    train_idx = paths_train[paths_train.str.contains('fsd')].index
+    # find the indices of esc and resp files in paths_val
+    val_idx = paths_val[paths_val.str.contains('esc|resp')].index
+    # iterate over the esc and resp file indices in paths_val. For this
+    # to work properly, len(train_idx) >= len(val_idx) must be true
+    if len(train_idx) >= len(val_idx):
+        for src_idx in val_idx:
+            # sample a random index of an fsd file in paths_train
+            sample = rng.integers(0,len(train_idx))
+            dst_idx = train_idx[sample]
+            # remove the sampled index so that it is not sampled again
+            train_idx = train_idx.delete(sample)
+            # switch the files
+            temp = paths_val.loc[src_idx].copy()
+            paths_val.loc[src_idx] = paths_train.loc[dst_idx].copy()
+            paths_train.loc[dst_idx] = temp
+            # if train_idx is empty after sampling all indices, break
+            if len(train_idx) == 0:
+                break
+    else:
+        print('\nCould not remove all ESC50 and RESP files from ' +
+              'validation and testing paths.')
+
+# check that paths_val no longer contains esc files
+
+print('\npaths_val contains ESC50 files? {}'.format(paths_val[0].str.contains('esc').any()))
+print('paths_val contains RESP files? {}'.format(paths_val[0].str.contains('resp').any()))
+
+paths_val,paths_test = train_test_split(paths_val,
+                                        train_size = 0.5,
+                                        random_state = rng_seed,
+                                        shuffle = True,
+                                        stratify = paths_val.str[0].astype(int))
 
 # how long extracted windows should be in seconds
 
@@ -110,15 +220,6 @@ max_passed = {'0_AUDIOSET':3,
 
 verbose = True
 
-# turn off SettingWithCopyWarning. default is 'warn'. Just in case,
-# this should be set to 'warn' during testing
-
-pd.options.mode.chained_assignment = None
-
-# initialize random number generator
-
-rng = np.random.default_rng()
-
 for window_length in window_lengths:
     
     print('\nProcessing windows of length {} seconds'.format(window_length))
@@ -142,17 +243,14 @@ for window_length in window_lengths:
     
     dst_dir.mkdir() # create the folder
     
-    # csv file containing timestamps of coughs
-
-    fp_cough_ts = open('cough_timestamps.csv')
+    train = []
+    val = []
+    test = []
     
-    # need to reset the generator every time it is iterated over
-    
-    cough_ts_reader = csv.reader(fp_cough_ts, delimiter=',')
-    
-    for dataset in data_dir.iterdir():
+    for dataset in [data_train,data_val,data_test]:
+        for path in dataset:
         
-        print('\nDataset: {}'.format(dataset.name))
+        
         
         # to count the number of processed files
 
