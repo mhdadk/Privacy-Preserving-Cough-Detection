@@ -98,7 +98,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 FENet_param_path = 'parameters/FENet/FENet.pkl'
 net = Disc(FENet_param_path).to(device)
-window_length = 1.0 # seconds
+window_length = 1.5 # seconds
 net_param_path = 'parameters/disc/{}_5epochs.pt'.format(str(window_length).replace('.','-')+'s')
 net.load_state_dict(torch.load(net_param_path,map_location=device))
 
