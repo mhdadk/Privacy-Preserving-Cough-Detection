@@ -96,6 +96,8 @@ data_dir = pathlib.Path('../../data/raw')
 
 # load paths
 
+print('\nLoading paths...')
+
 paths = []
 
 for label in data_dir.iterdir():
@@ -105,6 +107,8 @@ for label in data_dir.iterdir():
 paths = pd.Series(paths)
 
 # load cough timestamps
+
+print('\nLoading cough timestamps...')
 
 cough_timestamps = {}
 fp = open('cough_timestamps.csv')
@@ -125,6 +129,8 @@ for row in csv_reader:
 fp.close()
 
 # split paths
+
+print('\nSplitting paths...')
 
 paths_train,paths_val = train_test_split(paths,
                                          train_size = 0.8,
@@ -173,8 +179,8 @@ if paths_train.str.contains('fsd').any():
             # remove the sampled index so that it is not sampled again
             train_idx = train_idx.delete(sample)
             # switch the files
-            temp = paths_val.loc[src_idx].copy()
-            paths_val.loc[src_idx] = paths_train.loc[dst_idx].copy()
+            temp = paths_val.loc[src_idx]
+            paths_val.loc[src_idx] = paths_train.loc[dst_idx]
             paths_train.loc[dst_idx] = temp
             # if train_idx is empty after sampling all indices, break
             if len(train_idx) == 0:
@@ -185,8 +191,8 @@ if paths_train.str.contains('fsd').any():
 
 # check that paths_val no longer contains esc files
 
-print('\npaths_val contains ESC50 files? {}'.format(paths_val[0].str.contains('esc').any()))
-print('paths_val contains RESP files? {}'.format(paths_val[0].str.contains('resp').any()))
+print('\npaths_val contains ESC50 files? {}'.format(paths_val.str.contains('esc').any()))
+print('paths_val contains RESP files? {}'.format(paths_val.str.contains('resp').any()))
 
 paths_val,paths_test = train_test_split(paths_val,
                                         train_size = 0.5,
@@ -200,17 +206,14 @@ window_lengths = [1.0, 1.5, 2.0, 2.5, 3.0]
 
 # number of windows to extract per cough
 
-num_windows = 105
+windows_per_cough = 124
 
 """
 for non-cough windows,start randomly searching for snippets until
 <max_passed> windows have successfully been admitted
 """
 
-# TODO: change these such that |0_AUDIOSET| is equal to the size of
-# all others when augmented, but also equal to size of 1_COUGH
-
-max_passed = {'0_AUDIOSET':3,
+max_passed = {'0_AUDIOSET':4,
               '0_ESC50':2,
               '0_FSDKAGGLE2018':2,
               '0_RESP':2,
@@ -222,11 +225,7 @@ verbose = True
 
 for window_length in window_lengths:
     
-    print('\nProcessing windows of length {} seconds'.format(window_length))
-    
-    # to store the processing instructions for the data
-    
-    data = []
+    print('\nProcessing windows of length {} seconds...'.format(window_length))
     
     # where the processed data will be stored in csv format
 
@@ -243,63 +242,63 @@ for window_length in window_lengths:
     
     dst_dir.mkdir() # create the folder
     
-    train = []
-    val = []
-    test = []
+    """
+    to store the processing instructions for the training, validation,
+    and testing data. The first list stores the training metadata, the
+    second list stores the validation metadata, and the third list
+    stores the testing metadata
+    """
     
-    for dataset in [data_train,data_val,data_test]:
-        for path in dataset:
-        
-        
-        
-        # to count the number of processed files
-
-        num_processed = 0
-        
-        """
-        if analyzing the 1_COUGH dataset, then extract <num_windows> windows
-        of length <window_length> seconds that contain the coughs 
-        """
-        
-        if 'COUGH' in str(dataset):
+    data = [[],[],[]]
+    
+    # to count the number of processed files
+    
+    num_processed = 0
+    
+    for i,pathset in enumerate([paths_train,paths_val,paths_test]):
+        for _,path in pathset.iteritems():
             
-            for row in cough_ts_reader:
-                
-                # convert path to pathlib.Path object for easier handling
-                
-                row[0] = pathlib.Path(row[0])
+            # track progress
             
-                # get the length of the audio file in seconds
+            print('\rProcessed {} files'.format(num_processed),
+                  end='',flush=True)
+            
+            # full path to file
+            
+            full_path = data_dir / path
+            
+            # get file length
+            
+            file_length = librosa.get_duration(filename = str(full_path))
+            
+            """
+            if the entire audio file is not at least as long as 1.5
+            times the length of the window to be extracted, skip the
+            audio file
+            """
+            
+            if file_length < 1.5 * window_length:
+                continue
+            
+            # get name of dataset folder and file name
+            
+            dataset_name,filename = path.split('/')
+            
+            """
+            if analyzing the 1_COUGH dataset, then extract <num_windows>
+            windows of length <window_length> seconds that contain the
+            coughs 
+            """
+            
+            if 'COUGH' in dataset_name:
                 
-                split_filename = str(row[0]).split('_')
-                # for testing
-                # if (int(split_filename[1]) > 50 or
-                #     'esc' in split_filename[0] or
-                #     'fsd' in split_filename[0]):
-                #     continue
-                file = dataset / (split_filename[0]+'_'+split_filename[1]+row[0].suffix)
-                file_length = librosa.get_duration(filename = str(file))
+                # get locations of coughs in file. Need exception handling
+                # in case file does not contain coughs
                 
-                # compute the length of the cough in seconds
-                
-                cough_length = float(row[2]) - float(row[1])
-                
-                """
-                if the entire audio file is not at least as long as 1.5
-                times the length of the window to be extracted, skip the
-                audio file. Also, if the length of the cough is greater
-                than the length of the window to be extracted, skip this
-                cough
-                """
-                
-                if (file_length < 1.5 * window_length or
-                    cough_length > window_length):
+                try:
+                    coughs = cough_timestamps[filename]
+                except KeyError:
                     continue
-                
-                # track progress
-                
-                print('\rProcessed {} files'.format(num_processed),
-                      end='',flush=True)                
                 
                 """
                 given the signal:
@@ -332,48 +331,39 @@ for window_length in window_lengths:
                 the window
                 """
                 
-                low = max(0,float(row[2]) - window_length)
-                high = min(float(row[1]),file_length - window_length)
-                
-                # extract <num_windows> windows around this cough
-                
-                for _ in range(num_windows):
+                for cough_start,cough_end in coughs:
                     
-                    num_processed += 1
+                    """
+                    if the length of the cough is greater than the length
+                    of the window to be extracted, skip this cough
+                    """
                     
-                    # sample a random starting time for the window
+                    if (cough_end - cough_start) > window_length:
+                        continue
                     
-                    start = rng.uniform(low = low, high = high)
+                    # range for possible starting index of window
                     
-                    # store the metadata
+                    low = max(0,cough_end - window_length)
+                    high = min(cough_start,file_length - window_length)
                     
-                    path = pathlib.Path(dataset.name,file.name).as_posix()
-                    data.append([path,start,start + window_length])
+                    # extract <windows_per_cough> windows around this cough
+                    
+                    for _ in range(windows_per_cough):
                         
-            fp_cough_ts.close()
-        
-        else:
+                        # track progress
+                        
+                        num_processed += 1
+                        
+                        # sample a random starting time for the window
+                        
+                        start = rng.uniform(low = low, high = high)
+                        
+                        # store the metadata
+                        
+                        data[i].append([path,start,start + window_length])
             
-            for file in dataset.iterdir():
-                
-                # get the length of the audio file in seconds
-                
-                file_length = librosa.get_duration(filename = str(file))
-            
-                # if the entire audio file is not at least as long as 1.5
-                # times the length of the window to be extracted, skip the
-                # audio file
-            
-                # skip files that are shorter than snippet_length
-            
-                if file_length < 1.5 * window_length:
-                    continue
-                
-                # track progress
-                
-                print('\rProcessed {} files'.format(num_processed),
-                      end='',flush=True)
-                
+            else:
+                    
                 # number of windows to be admitted
             
                 num_passed = 0
@@ -386,7 +376,7 @@ for window_length in window_lengths:
                 
                 iter_count = 0
                 
-                while (num_passed < max_passed[dataset.name] and 
+                while (num_passed < max_passed[dataset_name] and 
                        iter_count < 100):
                     
                     iter_count += 1
@@ -404,7 +394,7 @@ for window_length in window_lengths:
                     # load the window from the audio file to check if it
                     # can be admitted
                     
-                    x,sr = librosa.load(path = str(file),
+                    x,sr = librosa.load(path = str(full_path),
                                         sr = None,
                                         mono = True,
                                         offset = start,
@@ -432,88 +422,11 @@ for window_length in window_lengths:
                         
                         # store the metadata
                         
-                        path = pathlib.Path(dataset.name,file.name).as_posix()
-                        data.append([path,start,start + window_length])
-    
-    print('\n\nSplitting data...')            
-    
-    data = pd.DataFrame(data)
-    
-    rng_seed = 42
-    
-    data_train,data_val = train_test_split(data,
-                                           train_size = 0.8,
-                                           random_state = rng_seed,
-                                           shuffle = True,
-                                           stratify = data[0].str[0].astype(int))
-    
-    """
-    ensure that ESC50 and RESP data is in training dataset and not
-    validation or testing.
-    
-    This is done by first iterating through data_val, checking if each file
-    is an ESC50 or RESP file. If not, the file is skipped. Otherwise,
-    randomly sample a file from data_train to be switched with the ESC50
-    or RESP file in data_val. If the file that was sampled from data_train
-    is already an ESC50 or RESP file, then sample again. Repeat this until
-    the randomly sampled file is no longer a ESC50 or RESP file. However, 
-    to maintain the desired class split ratios, the sampled file cannot be
-    a COUGH or LIBRISPEECH file either.
-    
-    Therefore, the sampled file must be a FSDKAGGLE2018 file. However,
-    if there are no FSDKAGGLE2018 files in data_train, then switching
-    the ESC50 or RESP file in data_val with a file in data_train will not
-    be possible. That is what the if statement is for.
-    
-    Additionally, it is possible that there are more ESC50 or RESP files
-    in data_val than there are FSDKAGGLE2018 files in data_train. In this
-    case, there will be ESC50 or RESP files leftover in data_val. However,
-    since there are more FSDKAGGLE2018 files than both ESC50 and RESP files
-    combined, then this will not be a problem    
-    """
-    
-    # if data_train contains fsd files
-    if data_train[0].str.contains('fsd').any():
-        # find the indices of fsd files in data_train
-        train_idx = data_train[0][data_train[0].str.contains('fsd')].index
-        # find the indices of esc and resp files in data_val
-        val_idx = data_val[0][data_val[0].str.contains('esc|resp')].index
-        # iterate over the esc and resp file indices in data_val. For this
-        # to work properly, len(train_idx) >= len(val_idx) must be true
-        if len(train_idx) >= len(val_idx):
-            for src_idx in val_idx:
-                # if not an ESC50 file or not a RESP file, skip
-                # if 'esc' not in row[1] and 'resp' not in row[1]:
-                #     continue
-                # sample a random index of an fsd file in data_train
-                sample = rng.integers(0,len(train_idx))
-                dst_idx = train_idx[sample]
-                # remove the sampled index so that it is not sampled again
-                train_idx = train_idx.delete(sample)
-                # # repeated sampling
-                # while 'fsd' not in data_train.loc[dst_idx][0]:
-                #     dst_idx = np.random.choice(data_train.index)
-                # switch the files
-                temp = data_val.loc[src_idx].copy()
-                data_val.loc[src_idx] = data_train.loc[dst_idx].copy()
-                data_train.loc[dst_idx] = temp
-                # if train_idx is empty after sampling all indices, break
-                if len(train_idx) == 0:
-                    break
-        else:
-            print('\nCould not remove all ESC50 and RESP files from ' +
-                  'validation and testing data.')
-    
-    if verbose:
-        # check that data_val no longer contains esc files
-        print('\ndata_val contains ESC50 files? {}'.format(data_val[0].str.contains('esc').any()))
-        print('data_val contains RESP files? {}'.format(data_val[0].str.contains('resp').any()))
-    
-    data_val,data_test = train_test_split(data_val,
-                                          train_size = 0.5,
-                                          random_state = rng_seed,
-                                          shuffle = True,
-                                          stratify = data_val[0].str[0].astype(int))
+                        data[i].append([path,start,start + window_length])
+        
+        # convert each dataset to pandas dataframe after processing
+        
+        data[i] = pd.DataFrame(data[i])
     
     if verbose:
         
@@ -522,29 +435,29 @@ for window_length in window_lengths:
         print('\nNumber of files per class:')
         
         for label in ['0','1','2']:
-            num_files = sum(data[0].str[0] == label)
+            num_files = sum(paths.str[0] == label)
             print('{} class = {} files'.format(label,num_files))
         
         # show train, val, test split ratios
         
         print('\nData split percentages:')
         
-        for data_split,name in zip([data_train,data_val,data_test],
-                                   ['train','val','test']):
-            percentage = len(data_split)/len(data)*100
+        total_size = sum(len(x) for x in data)
+        
+        for data_split,name in zip(data,['train','val','test']):
+            percentage = len(data_split)/total_size*100
             print('{} percentage = {:.2f}%'.format(name,percentage))
         
         # show train, val, test class split ratios to verify stratification
         
         print('\nOriginal class percentages:')
         for label in ['0','1','2']:
-            percentage = sum(data[0].str[0] == label)/len(data)*100
+            percentage = sum(paths.str[0] == label)/len(paths)*100
             print('{} class percentage = {:.2f}%'.format(label,percentage))
         
         print('\nNew class split percentages:')
         
-        for data_split,name in zip([data_train,data_val,data_test],
-                                   ['train','val','test']):
+        for data_split,name in zip(data,['train','val','test']):
             # other = 0
             # cough = 1
             # speech = 2
@@ -557,14 +470,14 @@ for window_length in window_lengths:
     print('\nWriting csv files...')
     print('-'*40)
     
-    data_train.to_csv(str(dst_dir / 'data_train.csv'),
+    data[0].to_csv(str(dst_dir / 'data_train.csv'),
                       header = False,
                       index = False)
     
-    data_val.to_csv(str(dst_dir / 'data_val.csv'),
+    data[1].to_csv(str(dst_dir / 'data_val.csv'),
                     header = False,
                     index = False)
     
-    data_test.to_csv(str(dst_dir / 'data_test.csv'),
+    data[2].to_csv(str(dst_dir / 'data_test.csv'),
                      header = False,
                      index = False)
