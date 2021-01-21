@@ -219,7 +219,7 @@ if __name__ == '__main__':
         
         # save the weights for the best validation accuracy
         
-        if val_acc > best_val_acc:
+        if val_acc > best_val_acc and train_acc < val_acc:
             print('Saving checkpoint...')
             best_val_acc = val_acc
             torch.save(net.state_dict(),param_path)
