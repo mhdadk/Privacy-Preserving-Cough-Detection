@@ -101,6 +101,10 @@ print('\nLoading paths...')
 paths = []
 
 for label in data_dir.iterdir():
+    # need this to only split 0_LIRBISPEECH and 1_COUGH
+    if (label.name != '0_LIBRISPEECH' and
+        label.name != '1_COUGH'):
+        continue
     for file in label.iterdir():
         paths.append('{}/{}'.format(file.parent.name,file.name))
 
@@ -138,62 +142,6 @@ paths_train,paths_val = train_test_split(paths,
                                          shuffle = True,
                                          stratify = paths.str[0].astype(int))
 
-"""
-ensure that ESC50 and RESP data is in training dataset and not
-validation or testing.
-
-This is done by first iterating through paths_val, checking if each file
-is an ESC50 or RESP file. If not, the file is skipped. Otherwise,
-randomly sample a file from paths_train to be switched with the ESC50
-or RESP file in paths_val. If the file that was sampled from paths_train
-is already an ESC50 or RESP file, then sample again. Repeat this until
-the randomly sampled file is no longer a ESC50 or RESP file. However, 
-to maintain the desired class split ratios, the sampled file cannot be
-a COUGH or LIBRISPEECH file either.
-
-Therefore, the sampled file must be a FSDKAGGLE2018 file. However,
-if there are no FSDKAGGLE2018 files in paths_train, then switching
-the ESC50 or RESP file in paths_val with a file in paths_train will not
-be possible. That is what the if statement is for.
-
-Additionally, it is possible that there are more ESC50 or RESP files
-in paths_val than there are FSDKAGGLE2018 files in paths_train. In this
-case, there will be ESC50 or RESP files leftover in paths_val. However,
-since there are more FSDKAGGLE2018 files than both ESC50 and RESP files
-combined, then this will not be a problem    
-"""
-
-# if paths_train contains fsd files
-if paths_train.str.contains('fsd').any():
-    # find the indices of fsd files in paths_train
-    train_idx = paths_train[paths_train.str.contains('fsd')].index
-    # find the indices of esc and resp files in paths_val
-    val_idx = paths_val[paths_val.str.contains('esc|resp')].index
-    # iterate over the esc and resp file indices in paths_val. For this
-    # to work properly, len(train_idx) >= len(val_idx) must be true
-    if len(train_idx) >= len(val_idx):
-        for src_idx in val_idx:
-            # sample a random index of an fsd file in paths_train
-            sample = rng.integers(0,len(train_idx))
-            dst_idx = train_idx[sample]
-            # remove the sampled index so that it is not sampled again
-            train_idx = train_idx.delete(sample)
-            # switch the files
-            temp = paths_val.loc[src_idx]
-            paths_val.loc[src_idx] = paths_train.loc[dst_idx]
-            paths_train.loc[dst_idx] = temp
-            # if train_idx is empty after sampling all indices, break
-            if len(train_idx) == 0:
-                break
-    else:
-        print('\nCould not remove all ESC50 and RESP files from ' +
-              'validation and testing paths.')
-
-# check that paths_val no longer contains esc files
-
-print('\npaths_val contains ESC50 files? {}'.format(paths_val.str.contains('esc').any()))
-print('paths_val contains RESP files? {}'.format(paths_val.str.contains('resp').any()))
-
 paths_val,paths_test = train_test_split(paths_val,
                                         train_size = 0.5,
                                         random_state = rng_seed,
@@ -206,18 +154,14 @@ window_lengths = [1.0, 1.5, 2.0, 2.5, 3.0]
 
 # number of windows to extract per cough
 
-windows_per_cough = 124
+windows_per_cough = 102
 
 """
-for non-cough windows,start randomly searching for snippets until
+for speech windows,start randomly searching for snippets until
 <max_passed> windows have successfully been admitted
 """
 
-max_passed = {'0_AUDIOSET':4,
-              '0_ESC50':2,
-              '0_FSDKAGGLE2018':2,
-              '0_RESP':2,
-              '2_LIBRISPEECH':2}
+max_passed = 4
 
 # whether to show train, val, and test ratios and class split ratios
 
@@ -376,8 +320,7 @@ for window_length in window_lengths:
                 
                 iter_count = 0
                 
-                while (num_passed < max_passed[dataset_name] and 
-                       iter_count < 100):
+                while (num_passed < max_passed and iter_count < 100):
                     
                     iter_count += 1
                     
@@ -434,7 +377,7 @@ for window_length in window_lengths:
         
         print('\nNumber of files per class:')
         
-        for label in ['0','1','2']:
+        for label in ['0','1']:
             num_files = sum(paths.str[0] == label)
             print('{} class = {} files'.format(label,num_files))
         
@@ -451,7 +394,7 @@ for window_length in window_lengths:
         # show train, val, test class split ratios to verify stratification
         
         print('\nOriginal class percentages:')
-        for label in ['0','1','2']:
+        for label in ['0','1']:
             percentage = sum(paths.str[0] == label)/len(paths)*100
             print('{} class percentage = {:.2f}%'.format(label,percentage))
         
@@ -461,7 +404,7 @@ for window_length in window_lengths:
             # other = 0
             # cough = 1
             # speech = 2
-            for label in ['0','1','2']:
+            for label in ['0','1']:
                 percentage = sum(data_split[0].str[0] == label)/len(data_split)*100
                 print('{} {} percentage = {:.2f}%'.format(label,name,percentage))
     
