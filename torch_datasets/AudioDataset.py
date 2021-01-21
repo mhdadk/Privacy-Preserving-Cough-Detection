@@ -5,8 +5,7 @@ import pandas as pd
 
 class AudioDataset(torch.utils.data.Dataset):
     
-    def __init__(self,raw_data_dir,window_length,sample_rate,mode,
-                 map_labels = True):
+    def __init__(self,raw_data_dir,window_length,sample_rate,mode):
         
         # path to raw data folder
         
@@ -34,11 +33,6 @@ class AudioDataset(torch.utils.data.Dataset):
         # what sampling rate to resample audio to
         
         self.new_sr = sample_rate
-        
-        # whether to map labels to be cough and non-cough only and not
-        # cough, speech, and other
-        
-        self.map_labels = map_labels
     
     def __len__(self):
         return len(self.metadata)
@@ -72,11 +66,9 @@ class AudioDataset(torch.utils.data.Dataset):
         
         x = torch.mean(x,dim=0,keepdim=True)
         
-        # get audio signal label and map it to cough and non-cough labels
+        # get audio signal label, 0 for speech, and 1 for cough
         
         label = int(self.metadata.iloc[idx,0][0])
-        if self.map_labels and label == 2:
-            label = 0
         
         return x,label
             
