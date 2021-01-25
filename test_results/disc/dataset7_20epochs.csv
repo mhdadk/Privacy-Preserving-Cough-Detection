@@ -1,7 +1,0 @@
-Sensitivity/Recall,0.978
-Specificity,0.875
-Accuracy,0.933
-Balanced accuracy,0.927
-Matthews correlation coefficient,0.866
-Precision/PPV,0.910
-NPV,0.969
