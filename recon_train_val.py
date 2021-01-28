@@ -93,7 +93,7 @@ net = Autoencoder(batch_norm = True).to(device)
 
 # number of epochs to train and validate for
 
-num_epochs = 5
+num_epochs = 20
 
 # initialize datasets and dataloaders
 
