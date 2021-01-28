@@ -41,10 +41,7 @@ def run_batch(x,net,mode,loss_func,optimizer,device):
             
             optimizer.zero_grad()
     
-    if mode == 'train':
-        return recon_loss.item()
-    else:
-        return x_hat,recon_loss.item()
+    return recon_loss.item()
 
 def run_epoch(mode,net,dataloader,optimizer,loss_func,device):
     
@@ -118,7 +115,7 @@ csv_writer.writerow(['Sample rate',sample_rate])
 
 pt_filename = (str(window_length).replace('.','-') + 's' + 
                '_' + str(num_epochs) + 'epochs.pt')
-param_path = 'parameters/disc/' + pt_filename
+param_path = 'parameters/recon/' + pt_filename
 
 # optimize dataloaders with GPU if available
 
