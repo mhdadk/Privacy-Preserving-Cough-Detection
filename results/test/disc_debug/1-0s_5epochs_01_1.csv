@@ -1,0 +1,8 @@
+1_COUGH/audioset_37.wav contains coughs and the network was trained on
+Sensitivity/Recall,1.000
+Specificity,0.357
+Accuracy,0.667
+Balanced accuracy,0.679
+Matthews correlation coefficient,0.459
+Precision/PPV,0.591
+NPV,1.000

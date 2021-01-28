@@ -1,0 +1,8 @@
+1_COUGH/audioset_28.wav contains coughs and the network was trained on
+Sensitivity/Recall,1.000
+Specificity,0.857
+Accuracy,0.889
+Balanced accuracy,0.929
+Matthews correlation coefficient,0.756
+Precision/PPV,0.667
+NPV,1.000

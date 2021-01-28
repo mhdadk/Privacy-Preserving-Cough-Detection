@@ -5,7 +5,12 @@ import pandas as pd
 
 class AudioDataset(torch.utils.data.Dataset):
     
-    def __init__(self,raw_data_dir,window_length,sample_rate,mode):
+    def __init__(self,raw_data_dir,window_length,sample_rate,mode,
+                 only_speech = False):
+        
+        # whether to only sample speech files
+        
+        self.only_speech = only_speech
         
         # path to raw data folder
         
@@ -29,6 +34,12 @@ class AudioDataset(torch.utils.data.Dataset):
                                 str(window_length).replace('.','-') + 's',
                                 'data_'+mode+'.csv')
         self.metadata = pd.read_csv(csv_path,header = None)
+        
+        # filter out non-speech files if necessary
+        
+        if only_speech:
+            where = self.metadata[0].str.contains('0_LIBRISPEECH')
+            self.metadata = self.metadata[where]
         
         # what sampling rate to resample audio to
         
@@ -66,11 +77,15 @@ class AudioDataset(torch.utils.data.Dataset):
         
         x = torch.mean(x,dim=0,keepdim=True)
         
-        # get audio signal label, 0 for speech, and 1 for cough
-        
-        label = int(self.metadata.iloc[idx,0][0])
-        
-        return x,label
+        if not self.only_speech:
+            
+            # get audio signal label, 0 for speech, and 1 for cough
+            
+            label = int(self.metadata.iloc[idx,0][0])
+            
+            return x,label
+        else:
+            return x
             
 if __name__ == '__main__':
 
@@ -82,19 +97,21 @@ if __name__ == '__main__':
     window_length = 1.5 # seconds
     sample_rate = 16000
     mode = 'train'
-    dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode)
+    dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode,
+                           only_speech = True)
     
     idx = random.randint(0,len(dataset))
-    x,label = dataset[idx]
+    # x,label = dataset[idx]
+    x = dataset[idx]
     
     # compute log Mel spectrogram
     
-    log = torchaudio.transforms.AmplitudeToDB()
-    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
-                                                    n_fft = 1024,
-                                                    n_mels = 64,
-                                                    hop_length = 10)
-    log_mel_spec = log(mel_spec(x))
+    # log = torchaudio.transforms.AmplitudeToDB()
+    # mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
+    #                                                 n_fft = 1024,
+    #                                                 n_mels = 64,
+    #                                                 hop_length = 10)
+    # log_mel_spec = log(mel_spec(x))
     
     # print('\nShowing signal for:\n{}'.format(dataset.paths[idx]))
     # plt.plot(x.numpy())

@@ -1,0 +1,8 @@
+1_COUGH/fsd_14.wav contains coughs and the network was trained on
+Sensitivity/Recall,1.000
+Specificity,0.714
+Accuracy,0.895
+Balanced accuracy,0.857
+Matthews correlation coefficient,0.782
+Precision/PPV,0.857
+NPV,1.000

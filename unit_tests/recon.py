@@ -78,8 +78,10 @@ y = {x / (x.max - x.min)} - {x.min / (x.max - x.min)}
 
 # encode
 
+# first layer
+
 conv1 = torch.nn.Conv2d(in_channels = 1,
-                        out_channels = 16,
+                        out_channels = 8,
                         kernel_size = 3,
                         stride = 1)
 

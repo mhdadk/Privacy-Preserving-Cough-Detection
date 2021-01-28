@@ -1,0 +1,8 @@
+1_COUGH/esc_29.wav contains coughs and the network was trained on
+Sensitivity/Recall,1.000
+Specificity,1.000
+Accuracy,1.000
+Balanced accuracy,1.000
+Matthews correlation coefficient,1.000
+Precision/PPV,1.000
+NPV,1.000

@@ -1,6 +1,7 @@
 import torch
 import torchaudio
 import time
+import csv
 
 from models.disc import Disc
 from torch_datasets.AudioDataset import AudioDataset
@@ -78,8 +79,7 @@ def run_epoch(mode,net,dataloader,optimizer,loss_func,device):
         
         # track progress
         
-        print('\rProgress: {:.2f}%'.format(i*dataloader.batch_size/
-                                         len(dataloader.dataset)*100),
+        print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
               end='',flush=True)
         
         # train or validate over the batch
@@ -121,9 +121,18 @@ num_epochs = 5
 # initialize datasets and dataloaders
 
 raw_data_dir = '../data/raw'
-window_length = 3.0 # seconds
+window_length = 1.5 # seconds
 sample_rate = 16000
 dataloaders = {}
+
+# csv file to write training and validation results
+
+fp = open('results/train_val/disc.csv', mode = 'w')
+csv_writer = csv.writer(fp,
+                        delimiter = ',',
+                        lineterminator = '\n')
+csv_writer.writerow(['Window length (seconds)',window_length])
+csv_writer.writerow(['Sample rate',sample_rate])
 
 # where to save parameters in a .pt file
 
@@ -137,13 +146,16 @@ dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 64 #16
-val_batch_size = 64 #16
+train_batch_size = 64
+val_batch_size = 64
+csv_writer.writerow(['Training batch size',train_batch_size])
+csv_writer.writerow(['Validation batch size',val_batch_size])
 
 for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
     
-    dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode)
+    dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode,
+                           only_speech = False)
     
     dataloaders[mode] = torch.utils.data.DataLoader(
                                dataset = dataset,
@@ -155,15 +167,25 @@ for mode,batch_size in [('train',train_batch_size),
 # Bernoulli distribution)
 
 loss_func = torch.nn.BCEWithLogitsLoss(reduction = 'sum')
+csv_writer.writerow(['Loss function',loss_func.__repr__()])
 
 # initialize optimizer. Must put net parameters on GPU before this step
 
 optimizer = torch.optim.Adam(params = net.parameters(),
                              lr = 0.0003)
+csv_writer.writerow(['Optimizer',optimizer.__module__])
+csv_writer.writerow(['Optimizer parameters',str(optimizer.defaults)])
 
 # record the best validation accuracy across epochs
 
 best_val_acc = 0
+
+csv_writer.writerow(['Epoch',
+                     'Epoch time',
+                     'Training loss',
+                     'Training accuracy',
+                     'Validation loss',
+                     'Validation accuracy'])
 
 if __name__ == '__main__':
 
@@ -215,6 +237,15 @@ if __name__ == '__main__':
         
         epoch_time = time.strftime("%H:%M:%S",time.gmtime(epoch_end-epoch_start))
         
+        # record results
+        
+        csv_writer.writerow([epoch+1,
+                             epoch_time,
+                             '{:.4f}'.format(train_loss),
+                             '{:.4f}'.format(train_acc),
+                             '{:.4f}'.format(val_loss),
+                             '{:.4f}'.format(val_acc)])
+        
         print('\nEpoch Elapsed Time (HH:MM:SS): ' + epoch_time)
         
         # save the weights for the best validation accuracy
@@ -230,3 +261,5 @@ if __name__ == '__main__':
     total_time = time.strftime("%H:%M:%S",time.gmtime(end-start))
     print('\nTotal Time Elapsed (HH:MM:SS): ' + total_time)
     print('Best Validation Accuracy: {:.2f}%'.format(best_val_acc*100))
+
+fp.close()

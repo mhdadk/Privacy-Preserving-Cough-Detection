@@ -1,25 +1,29 @@
 import torch
-from collections import OrderedDict
 
 class PTanh(torch.nn.Module):
     
     # PTanh(x) = a * tanh(b * x)
     
-    def __init__(self,num_parameters):
+    def __init__(self,in_channels):
         
         super().__init__()
         
+        # need this for __repr__ method
+        
+        self.in_channels = in_channels
+        
         # initialize a
         
-        a = torch.full((num_parameters,1), 1.7159)
-        # torch.nn.init.normal_(a)
+        a = torch.full((in_channels,1), 1.7159)
         self.a = torch.nn.Parameter(a,requires_grad = True)
         
         # initialize b
         
-        b = torch.full((num_parameters,1), 2/3)
-        # torch.nn.init.normal_(b)
+        b = torch.full((in_channels,1), 2/3)
         self.b = torch.nn.Parameter(b,requires_grad = True)
+    
+    def __repr__(self):
+        return 'PTanh(' + str(self.in_channels) + ')'
     
     def forward(self,x):
         x = torch.multiply(x,self.a)
@@ -28,99 +32,143 @@ class PTanh(torch.nn.Module):
 
 class Autoencoder(torch.nn.Module):
     
-    def __init__(self):
+    def __init__(self,batch_norm = False):
         
         super().__init__()
         
         # encoder --------------------------------------------------------
         
-        encoder = OrderedDict()
+        encoder = []
         
         # first layer
         
-        encoder['conv1'] = torch.nn.Conv1d(in_channels = 1,
-                                           out_channels = 16,
-                                           kernel_size = 3,
-                                           stride = 1)
+        layer = [torch.nn.Conv1d(in_channels = 1,
+                                 out_channels = 16,
+                                 kernel_size = 3,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(16),
+                 torch.nn.Conv1d(in_channels = 16,
+                                 out_channels = 16,
+                                 kernel_size = 2,
+                                 stride = 2,
+                                 bias = True)]
         
-        encoder['act1'] = PTanh(16)
+        encoder.extend(layer)
         
-        encoder['out1'] = torch.nn.Conv1d(in_channels = 16,
-                                          out_channels = 16,
-                                          kernel_size = 2,
-                                          stride = 2)
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm1d(num_features = 16,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
         # second layer
         
-        encoder['conv2'] = torch.nn.Conv1d(in_channels = 16,
-                                           out_channels = 32,
-                                           kernel_size = 5,#3,
-                                           stride = 1)
+        layer = [torch.nn.Conv1d(in_channels = 16,
+                                 out_channels = 32,
+                                 kernel_size = 5,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(32),
+                 torch.nn.Conv1d(in_channels = 32,
+                                 out_channels = 32,
+                                 kernel_size = 2,
+                                 stride = 2,
+                                 bias = True)]
         
-        encoder['act2'] = PTanh(32)
+        encoder.extend(layer)
         
-        encoder['out2'] = torch.nn.Conv1d(in_channels = 32,
-                                          out_channels = 32,
-                                          kernel_size = 2,
-                                          stride = 2)
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm1d(num_features = 32,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
         # third layer
         
-        encoder['conv3'] = torch.nn.Conv1d(in_channels = 32,
-                                           out_channels = 64,
-                                           kernel_size = 7,#3,
-                                           stride = 1)
+        layer = [torch.nn.Conv1d(in_channels = 32,
+                                 out_channels = 64,
+                                 kernel_size = 7,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(64),
+                 torch.nn.Conv1d(in_channels = 64,
+                                 out_channels = 64,
+                                 kernel_size = 2,
+                                 stride = 2,
+                                 bias = True)]
         
-        encoder['act3'] = PTanh(64)
+        encoder.extend(layer)
         
-        encoder['out3'] = torch.nn.Conv1d(in_channels = 64,
-                                          out_channels = 64,
-                                          kernel_size = 2,
-                                          stride = 2)
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm1d(num_features = 64,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
-        self.encoder = torch.nn.Sequential(encoder)
+        self.encoder = torch.nn.Sequential(*encoder)
         
         # decoder --------------------------------------------------------
         
-        decoder = OrderedDict()
+        decoder = []
         
         # fourth layer
         
-        decoder['us4'] = torch.nn.Upsample(scale_factor = 2,
-                                           mode = 'nearest')
+        layer = [torch.nn.Upsample(scale_factor = 2,
+                                   mode = 'nearest'),
+                 torch.nn.Conv1d(in_channels = 64,
+                                 out_channels = 32,
+                                 kernel_size = 7,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(32)]
         
-        decoder['conv4'] = torch.nn.Conv1d(in_channels = 64,
-                                           out_channels = 32,
-                                           kernel_size = 7,#3,
-                                           stride = 1)
+        decoder.extend(layer)
         
-        decoder['out4'] = PTanh(32)
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm1d(num_features = 32,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
         # fifth layer
         
-        decoder['us5'] = torch.nn.Upsample(scale_factor = 2,
-                                           mode = 'nearest')
+        layer = [torch.nn.Upsample(scale_factor = 2,
+                                   mode = 'nearest'),
+                 torch.nn.Conv1d(in_channels = 32,
+                                 out_channels = 16,
+                                 kernel_size = 5,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(16)]
         
-        decoder['conv5'] = torch.nn.Conv1d(in_channels = 32,
-                                           out_channels = 16,
-                                           kernel_size = 5,#3,
-                                           stride = 1)
+        decoder.extend(layer)
         
-        decoder['out5'] = PTanh(16)
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm1d(num_features = 16,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
         # sixth layer
         
-        decoder['us6'] = torch.nn.Upsample(size = 3006,
-                                           mode = 'nearest')
+        layer = [torch.nn.Upsample(size = 3006,
+                                   mode = 'nearest'),
+                 PTanh(16),
+                 torch.nn.Conv1d(in_channels = 16,
+                                 out_channels = 1,
+                                 kernel_size = 7,
+                                 stride = 1,
+                                 bias = True)]
         
-        decoder['act1'] = PTanh(16)
+        decoder.extend(layer)
         
-        decoder['out6'] = torch.nn.Conv1d(in_channels = 16,
-                                          out_channels = 1,
-                                          kernel_size = 7,#3,
-                                          stride = 1)
-        
-        self.decoder = torch.nn.Sequential(decoder)
+        self.decoder = torch.nn.Sequential(*decoder)
         
     def forward(self,x):
         x = self.encoder(x)
@@ -129,14 +177,28 @@ class Autoencoder(torch.nn.Module):
 
 if __name__ == '__main__':
     
-    net = Autoencoder()
+    from torchsummary import summary
     
-    x = torch.rand(8,1,3000)
+    net = Autoencoder(batch_norm = True)
+    net.eval()
+    
+    batch_size = 8
+    num_channels = 1
+    window_length = 1.5 # seconds
+    sample_rate = 2000
+    
+    x = torch.rand(batch_size,num_channels,int(window_length * sample_rate))
+    
+    print('Input shape: {}'.format(tuple(x.shape)))
     
     # zero mean and unit variance TODO: try 0.5 mean instead
 
-    x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1) + 0.5),
+    x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
                    x.std(dim = 2).unsqueeze(dim = -1))
+    
+    print('Normalized shape: {}'.format(tuple(x.shape)))
+    print('Normalized mean: {}'.format(x.mean()))
+    print('Normalized variance: {}'.format(x.var()))
     
     """
     scale each signal to be between 0 and 1. This is equivalent to:
@@ -150,10 +212,11 @@ if __name__ == '__main__':
     
     """
     
-    x = torch.multiply(torch.div(1,x.max(dim = 2)[0].unsqueeze(dim = -1) - 
-                                   x.min(dim = 2)[0].unsqueeze(dim = -1)),
-                       x - x.min(dim = 2)[0].unsqueeze(dim = -1))
+    # x = torch.multiply(torch.div(1,x.max(dim = 2)[0].unsqueeze(dim = -1) - 
+    #                                x.min(dim = 2)[0].unsqueeze(dim = -1)),
+    #                    x - x.min(dim = 2)[0].unsqueeze(dim = -1))
     
-    # compute reconstruction
+    # summary of net
     
-    x_hat = net(x)
+    summary(net,tuple(x.shape[1:]))
+    
