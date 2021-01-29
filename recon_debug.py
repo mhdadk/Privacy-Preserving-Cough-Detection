@@ -105,7 +105,7 @@ dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'train',
 dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
 dataloader = torch.utils.data.DataLoader(dataset = dataset,
-                                         batch_size = 8,
+                                         batch_size = 64,
                                          shuffle = False,
                                          **dl_config)
 

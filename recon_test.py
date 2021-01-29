@@ -1,9 +1,54 @@
 import torch
+# from collections import OrderedDict
 
 from models.recon import Autoencoder
+# from torch_datasets.SpeechDataset import SpeechDataset
 from torch_datasets.AudioDataset import AudioDataset
 
-from collections import OrderedDict
+import matplotlib.pyplot as plt
+import sounddevice as sd
+
+def run_batch(x,net,mode,loss_func,optimizer,device):
+    
+    # move to GPU if available
+    
+    x = x.to(device)
+    
+    with torch.set_grad_enabled(mode == 'train'):
+        
+        # zero mean and unit variance
+        
+        x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
+                       x.std(dim = 2).unsqueeze(dim = -1))
+        
+        # compute reconstruction of input signal
+        
+        x_hat = net(x)
+        
+        # compute reconstruction loss as negative log-likelihood
+        
+        recon_loss = loss_func(x_hat,x)
+        
+        if mode == 'train':
+        
+            # compute gradients of reconstruction loss with respect to
+            # parameters
+            
+            recon_loss.backward()
+            
+            # update parameters using these gradients. Minimizing the negative
+            # log-likelihood is equivalent to maximizing the log-likelihood
+            
+            optimizer.step()
+            
+            # zero the accumulated parameter gradients
+            
+            optimizer.zero_grad()
+    
+    if mode == 'train':
+        return recon_loss.item()
+    else:
+        return x_hat,recon_loss.item()
 
 # for reproducibility
 
@@ -17,66 +62,86 @@ use_cuda = torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-# initialize datasets and dataloaders
-# dataset_num can be equal to 3,4,5,6,7, or 8 only
+# config
 
-dataset_num = 4
-dataset_dir = '../datasets/' + str(dataset_num if dataset_num != 8 else 1)
-dataset_split_dir = '../datasets_splits/' + str(dataset_num)
+raw_data_dir = '../data/raw'
+window_length = 1.5 # seconds
 sample_rate = 2000
-dataset = AudioDataset(dataset_dir,
-                       dataset_split_dir,
-                       'test',
-                       sample_rate)
+num_epochs = 60
 
-# initialize reconstruction network and load parameters
+# initialize reconstruction network
 
-net = Autoencoder().to(device)
-num_epochs = 20
-pt_filename = 'dataset'+str(dataset_num)+'_'+str(num_epochs)+'epochs.pt'
+net = Autoencoder(batch_norm = True).to(device)
+pt_filename = (str(window_length).replace('.','-') + 's' + 
+               '_' + str(num_epochs) + 'epochs.pt')
 param_path = 'parameters/recon/' + pt_filename
-net.load_state_dict(torch.load(param_path))
+net.load_state_dict(torch.load(param_path,map_location = device))
+net.eval()
 
 # register forward hooks to record the output tensors from each layer
 
-layer_output = OrderedDict()
+# layer_output = OrderedDict()
 
-def get_output(module_name):
-    def hook(module,input,output):
-        layer_output[module_name] = output.detach()
-    return hook
+# def get_output(module_name):
+#     def hook(module,input,output):
+#         layer_output[module_name] = output.detach()
+#     return hook
 
-for name, module in net.named_modules():
-    if 'out' in name:
-        parent, child = name.split('.')
-        net.__getattr__(parent).__getattr__(child).register_forward_hook(
-                                    get_output(name))
+# for name, module in net.named_modules():
+#     if 'out' in name:
+#         parent, child = name.split('.')
+#         net.__getattr__(parent).__getattr__(child).register_forward_hook(
+#                                     get_output(name))
 
-# sample an audio signal
+# whether to use a single speech file or sample a batch of speech files
 
-idx = torch.randint(0,len(dataset),(1,)).item()
-x,label = dataset[idx]
-x = torch.unsqueeze(x, dim = 0)
+# single_file = False
 
-# preprocessing
+# initialize datasets and dataloaders
 
-# zero mean and unit variance
+dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'test',
+                       only_speech = True)
 
-x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
-               x.std(dim = 2).unsqueeze(dim = -1))
+# speech_data_dir = pathlib.Path('../datasets2/4/2_LIBRISPEECH')
+# window_length = 1.5 # seconds
+# sample_rate = 2000
+# dataset = SpeechDataset(str(speech_data_dir),window_length,sample_rate)
 
-"""
-scale each signal to be between 0 and 1. This is equivalent to:
+# optimize dataloaders with GPU if available
 
-y = {x / (x.max - x.min)} - {x.min / (x.max - x.min)}
-  = (1 / x.max - x.min) * (x - x.min)
+dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
-"""
+dataloader = torch.utils.data.DataLoader(dataset = dataset,
+                                         batch_size = 8,
+                                         shuffle = False,
+                                         **dl_config)
 
-x = torch.multiply(torch.div(1,x.max(dim = 2)[0].unsqueeze(dim = -1) - 
-                               x.min(dim = 2)[0].unsqueeze(dim = -1)),
-                   x - x.min(dim = 2)[0].unsqueeze(dim = -1))
+# initialize loss function
 
-# reconstruct the audio signal
+loss_func = torch.nn.SmoothL1Loss(reduction = 'mean',
+                                  beta = 1.0)
 
-x_hat = net(x)
+#%%
+
+# load a batch
+
+x = next(iter(dataloader))
+
+x_hat,recon_loss = run_batch(x,net,'test',loss_func,None,device)
+
+print('Reconstruction loss: {}'.format(recon_loss))
+
+idx = 3
+
+plt.subplot(2,1,1)
+plt.plot(x[idx].squeeze().detach().numpy())
+plt.subplot(2,1,2)
+plt.plot(x_hat[idx].squeeze().detach().numpy())
+
+#%%
+
+sd.play(x[idx].squeeze().detach().numpy(),2000)
+
+#%%
+
+sd.play(x_hat[idx].squeeze().detach().numpy(),2000)
