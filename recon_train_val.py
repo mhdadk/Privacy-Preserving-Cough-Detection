@@ -151,7 +151,7 @@ csv_writer.writerow(['Loss function beta',loss_func.beta])
 # initialize optimizer. Must put net parameters on GPU before this step
 
 optimizer = torch.optim.Adam(params = net.parameters(),
-                             lr = 0.0003)
+                             lr = 0.005) #0.0003
 csv_writer.writerow(['Optimizer',optimizer.__module__])
 csv_writer.writerow(['Optimizer parameters',str(optimizer.defaults)])
 
