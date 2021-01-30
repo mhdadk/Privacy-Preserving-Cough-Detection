@@ -98,7 +98,7 @@ net.eval()
 
 # initialize datasets and dataloaders
 
-dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'test',
+dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'train',
                        only_speech = True)
 
 # speech_data_dir = pathlib.Path('../datasets2/4/2_LIBRISPEECH')
