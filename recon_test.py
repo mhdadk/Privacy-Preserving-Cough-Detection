@@ -72,8 +72,7 @@ num_epochs = 60
 # initialize reconstruction network
 
 net = Autoencoder(batch_norm = True).to(device)
-pt_filename = (str(window_length).replace('.','-') + 's' + 
-               '_' + str(num_epochs) + 'epochs.pt')
+pt_filename = '1-5s_120epochs.pt'
 param_path = 'parameters/recon/' + pt_filename
 net.load_state_dict(torch.load(param_path,map_location = device))
 net.eval()
@@ -121,17 +120,17 @@ dataloader = torch.utils.data.DataLoader(dataset = dataset,
 loss_func = torch.nn.SmoothL1Loss(reduction = 'mean',
                                   beta = 1.0)
 
-#%%
-
 # load a batch
 
 x = next(iter(dataloader))
+
+#%%
 
 x_hat,recon_loss = run_batch(x,net,'test',loss_func,None,device)
 
 print('Reconstruction loss: {}'.format(recon_loss))
 
-idx = 3
+idx = 0
 
 plt.subplot(2,1,1)
 plt.plot(x[idx].squeeze().detach().numpy())
