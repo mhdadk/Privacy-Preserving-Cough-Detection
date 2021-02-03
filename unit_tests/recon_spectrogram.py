@@ -28,7 +28,13 @@ y = spec(x)
 
 mag,phase = torchaudio.functional.magphase(y)
 
+scale_factor = mag.max()
+
+mag = mag / mag.max()
+
 # assume we reconstructed the magnitude spectrogram
+
+mag = mag * scale_factor
 
 # z = |z| cos(phase) + j |z| * sin(phase)
 
