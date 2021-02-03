@@ -6,11 +6,15 @@ import pandas as pd
 class AudioDataset(torch.utils.data.Dataset):
     
     def __init__(self,raw_data_dir,window_length,sample_rate,mode,
-                 only_speech = False):
+                 normalize = True, only_speech = False):
         
         # whether to only sample speech files
         
         self.only_speech = only_speech
+        
+        # whether to normalize to zero mean and unit variance
+        
+        self.normalize = normalize
         
         # path to raw data folder
         
@@ -76,6 +80,11 @@ class AudioDataset(torch.utils.data.Dataset):
         # convert to mono
         
         x = torch.mean(x,dim=0,keepdim=True)
+        
+        # normalize to zero mean and unit variance
+        
+        if self.normalize:
+            x = (x - x.mean()) / x.std()
         
         if not self.only_speech:
             
