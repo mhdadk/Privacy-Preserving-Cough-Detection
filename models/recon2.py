@@ -32,7 +32,7 @@ class PTanh(torch.nn.Module):
 
 class Autoencoder(torch.nn.Module):
     
-    def __init__(self):
+    def __init__(self, batch_norm = False):
         
         super().__init__()
         
@@ -40,33 +40,47 @@ class Autoencoder(torch.nn.Module):
         
         encoder = []
         
-        first_layer = [torch.nn.Conv2d(in_channels = 1,
-                                       out_channels = 32,
-                                       kernel_size = 3,
-                                       stride = 1,
-                                       bias = False),
-                       PTanh(32),
-                       torch.nn.Conv2d(in_channels = 32,
-                                       out_channels = 32,
-                                       kernel_size = 2,
-                                       stride = (1,2),
-                                       bias = False)]
+        layer = [torch.nn.Conv2d(in_channels = 1,
+                                 out_channels = 32,
+                                 kernel_size = 3,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(32),
+                 torch.nn.Conv2d(in_channels = 32,
+                                 out_channels = 32,
+                                 kernel_size = 2,
+                                 stride = 2,
+                                 bias = True)]
         
-        encoder.extend(first_layer)
+        encoder.extend(layer)
         
-        second_layer = [torch.nn.Conv2d(in_channels = 32,
-                                       out_channels = 64,
-                                       kernel_size = 3,
-                                       stride = 1,
-                                       bias = False),
-                       PTanh(64),
-                       torch.nn.Conv2d(in_channels = 64,
-                                       out_channels = 64,
-                                       kernel_size = 2,
-                                       stride = 2,
-                                       bias = False)]
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm2d(num_features = 32,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
-        encoder.extend(second_layer)
+        layer = [torch.nn.Conv2d(in_channels = 32,
+                                 out_channels = 64,
+                                 kernel_size = 3,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(64),
+                 torch.nn.Conv2d(in_channels = 64,
+                                 out_channels = 64,
+                                 kernel_size = 2,
+                                 stride = 2,
+                                 bias = True)]
+        
+        encoder.extend(layer)
+        
+        if batch_norm:
+            encoder.append(torch.nn.BatchNorm2d(num_features = 64,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
         self.encoder = torch.nn.Sequential(*encoder)
         
@@ -74,31 +88,34 @@ class Autoencoder(torch.nn.Module):
         
         decoder = []
         
-        third_layer = [torch.nn.Upsample(size = (130,130),
-                                         mode = 'nearest'),
-                       torch.nn.Conv2d(in_channels = 64,
-                                       out_channels = 32,
-                                       kernel_size = 3,
-                                       stride = 1,
-                                       bias = False),
-                       PTanh(32)]
+        layer = [torch.nn.Upsample(size = (130,130),
+                                   mode = 'nearest'),
+                 torch.nn.Conv2d(in_channels = 64,
+                                 out_channels = 32,
+                                 kernel_size = 3,
+                                 stride = 1,
+                                 bias = True),
+                 PTanh(32)]
         
-        decoder.extend(third_layer)
+        decoder.extend(layer)
         
-        fourth_layer = [torch.nn.Upsample(size = (152,162),
-                                          mode = 'nearest'),
-                        torch.nn.Conv2d(in_channels = 32,
-                                        out_channels = 1,
-                                        kernel_size = 3,
-                                        stride = 1,
-                                        bias = False),
-                        PTanh(1)]
+        if batch_norm:
+            decoder.append(torch.nn.BatchNorm2d(num_features = 32,
+                                                eps = 1e-08,
+                                                momentum = 0.1,
+                                                affine = True,
+                                                track_running_stats = True))
         
-        decoder.extend(fourth_layer)
+        layer = [torch.nn.Upsample(size = (259,253),
+                                   mode = 'nearest'),
+                 PTanh(32),
+                 torch.nn.Conv2d(in_channels = 32,
+                                 out_channels = 1,
+                                 kernel_size = 3,
+                                 stride = 1,
+                                 bias = True)]
         
-        # flatten to same shape as input 1D signal
-        
-        decoder.append(torch.nn.Flatten(start_dim = 2))
+        decoder.extend(layer)
         
         self.decoder = torch.nn.Sequential(*decoder)
         
@@ -112,25 +129,35 @@ if __name__ == '__main__':
     import torchaudio
     from torchsummary import summary
     
-    net = Autoencoder()
+    net = Autoencoder(batch_norm = True)
     
     batch_size = 8
     num_channels = 1
+    sr = 16000
     length_sec = 1.5
-    sample_rate = 16000
-    
-    x = torch.rand(batch_size,num_channels,int(length_sec * sample_rate))
+    x = torch.rand(batch_size,num_channels,int(length_sec * sr))
     
     print('Input shape: {}'.format(tuple(x.shape)))
     
-    log = torchaudio.transforms.AmplitudeToDB()
-    mel_spec = torchaudio.transforms.MelSpectrogram(sample_rate = sample_rate,
-                                                    n_fft = 1024,
-                                                    n_mels = 128,
-                                                    hop_length = 64)
-    x = log(mel_spec(x))
+    win_length_sec = 0.012
+    win_length = int(sr * win_length_sec)
+    # need 50% overlap to satisfy constant-overlap-add constraint to allow
+    # for perfect reconstruction using inverse STFT
+    hop_length = int(sr * win_length_sec / 2)
     
-    print('Log Mel-scale spectrogram shape: {}'.format(tuple(x.shape)))
+    spec = torchaudio.transforms.Spectrogram(n_fft = 512,
+                                             win_length = win_length,
+                                             hop_length = hop_length,
+                                             pad = 0,
+                                             window_fn = torch.hann_window,
+                                             power = None,
+                                             normalized = False,
+                                             wkwargs = None)
+    x = spec(x)
+    
+    print('Spectrogram shape: {}'.format(tuple(x.shape)))
+    
+    x,phase = torchaudio.functional.magphase(x)
     
     # zero mean and unit variance. The expression [(..., ) + (None, ) * 2] is
     # used to unsqueeze 2 dimensions at the end of x.mean(dim = (2,3))
