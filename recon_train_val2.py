@@ -103,7 +103,7 @@ num_epochs = 5
 
 # initialize datasets and dataloaders
 
-raw_data_dir = '../data/raw'
+raw_data_dir = 'data/raw'
 window_length = 1.5 # seconds
 sample_rate = 16000
 dataloaders = {}
