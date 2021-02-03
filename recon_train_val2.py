@@ -148,8 +148,8 @@ dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
 # batch sizes for training, validation, and testing
 
-train_batch_size = 8
-val_batch_size = 8
+train_batch_size = 64
+val_batch_size = 64
 csv_writer.writerow(['Training batch size',train_batch_size])
 csv_writer.writerow(['Validation batch size',val_batch_size])
 
