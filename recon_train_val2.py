@@ -18,12 +18,6 @@ def run_batch(x,spec,net,mode,loss_func,optimizer,device):
         
         x = torchaudio.functional.magphase(x)[0]
         
-        # zero mean and unit variance. The expression [(..., ) + (None, ) * 2] is
-        # used to unsqueeze 2 dimensions at the end of x.mean(dim = (2,3))
-        
-        x = torch.div(x - x.mean(dim = (2,3))[(..., ) + (None, ) * 2],
-                      x.std(dim = (2,3))[(..., ) + (None, ) * 2])
-        
         # compute reconstruction of input signal
         
         x_hat = net(x)
@@ -153,7 +147,7 @@ for mode,batch_size in [('train',train_batch_size),
                         ('val',val_batch_size)]:
     
     dataset = AudioDataset(raw_data_dir,window_length,sample_rate,mode,
-                           only_speech = True)
+                           normalize = True,only_speech = True)
     
     dataloaders[mode] = torch.utils.data.DataLoader(
                                dataset = dataset,
