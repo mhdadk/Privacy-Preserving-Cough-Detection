@@ -16,17 +16,17 @@ def run_batch(x,spec,net,mode,loss_func,optimizer,device):
     
     x = torchaudio.functional.magphase(x)[0]
     
+    # scale each example in the batch to interval [0,1]
+    
     scale_factor = x.amax(dim=(2,3))[(..., ) + (None, ) * 2]
     
-    # scale each example in a batch to interval [0,1]
-    
-    x = x / scale_factor
+    x_scaled = x / scale_factor
     
     with torch.set_grad_enabled(mode == 'train'):
         
         # compute reconstruction of input signal
         
-        x_hat = net(x)
+        x_hat = net(x_scaled)
         
         # re-scale back to normal values
         
