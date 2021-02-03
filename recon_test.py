@@ -1,14 +1,15 @@
 import torch
+import torchaudio
+import librosa.display
 # from collections import OrderedDict
 
-from models.recon import Autoencoder
-# from torch_datasets.SpeechDataset import SpeechDataset
+from models.recon2 import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
 
 import matplotlib.pyplot as plt
 import sounddevice as sd
 
-def run_batch(x,net,mode,loss_func,optimizer,device):
+def run_batch(x,spec,net,mode,loss_func,optimizer,device):
     
     # move to GPU if available
     
@@ -16,16 +17,15 @@ def run_batch(x,net,mode,loss_func,optimizer,device):
     
     with torch.set_grad_enabled(mode == 'train'):
         
-        # zero mean and unit variance
+        x = spec(x)
         
-        x = torch.div((x - x.mean(dim = 2).unsqueeze(dim = -1)),
-                       x.std(dim = 2).unsqueeze(dim = -1))
+        x = torchaudio.functional.magphase(x)[0]
         
         # compute reconstruction of input signal
         
         x_hat = net(x)
         
-        # compute reconstruction loss as negative log-likelihood
+        # compute reconstruction loss
         
         recon_loss = loss_func(x_hat,x)
         
@@ -36,15 +36,14 @@ def run_batch(x,net,mode,loss_func,optimizer,device):
             
             recon_loss.backward()
             
-            # update parameters using these gradients. Minimizing the negative
-            # log-likelihood is equivalent to maximizing the log-likelihood
+            # update parameters using these gradients
             
             optimizer.step()
             
             # zero the accumulated parameter gradients
             
             optimizer.zero_grad()
-    
+            
     if mode == 'train':
         return recon_loss.item()
     else:
@@ -64,15 +63,14 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 # config
 
-raw_data_dir = '../data/raw'
+raw_data_dir = 'data/raw'
 window_length = 1.5 # seconds
-sample_rate = 2000
-num_epochs = 60
+sample_rate = 16000
 
 # initialize reconstruction network
 
 net = Autoencoder(batch_norm = True).to(device)
-pt_filename = '1-5s_120epochs.pt'
+pt_filename = '1-5s_5epochs.pt'
 param_path = 'parameters/recon/' + pt_filename
 net.load_state_dict(torch.load(param_path,map_location = device))
 net.eval()
@@ -99,7 +97,7 @@ net.eval()
 # initialize datasets and dataloaders
 
 dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'train',
-                       only_speech = True)
+                       normalize = True, only_speech = True)
 
 # speech_data_dir = pathlib.Path('../datasets2/4/2_LIBRISPEECH')
 # window_length = 1.5 # seconds
@@ -117,8 +115,24 @@ dataloader = torch.utils.data.DataLoader(dataset = dataset,
 
 # initialize loss function
 
-loss_func = torch.nn.SmoothL1Loss(reduction = 'mean',
-                                  beta = 1.0)
+def loss_func(x_hat,x,alpha = 1):
+    
+    # spectral convergence
+    
+    num = torch.linalg.norm(x - x_hat, ord = 'fro', dim = (2,3)).squeeze()
+    den = torch.linalg.norm(x, ord = 'fro', dim = (2,3)).squeeze()
+    spec_conv = torch.div(num,den)
+    
+    # log-scale STFT magnitude loss
+    
+    eps = 1e-10
+    log_loss = torch.linalg.norm(torch.log(x + eps) - torch.log(x_hat + eps),
+                                 ord = 1, dim = (2,3)).squeeze()
+    
+    return torch.mean(spec_conv + alpha * log_loss)
+
+# loss_func = torch.nn.SmoothL1Loss(reduction = 'mean',
+#                                   beta = 1.0)
 
 # load a batch
 
@@ -126,9 +140,28 @@ x = next(iter(dataloader))
 
 #%%
 
-x_hat,recon_loss = run_batch(x,net,'test',loss_func,None,device)
+win_length_sec = 0.012
+win_length = int(sample_rate * win_length_sec)
+# need 50% overlap to satisfy constant-overlap-add constraint to allow
+# for perfect reconstruction using inverse STFT
+hop_length = int(sample_rate * win_length_sec / 2)
+
+spec = torchaudio.transforms.Spectrogram(n_fft = 512,
+                                         win_length = win_length,
+                                         hop_length = hop_length,
+                                         pad = 0,
+                                         window_fn = torch.hann_window,
+                                         power = None,
+                                         normalized = False,
+                                         wkwargs = None).to(device)
+
+y = spec(x)
+y = torchaudio.functional.magphase(y)[0]
+y_hat,recon_loss = run_batch(x,spec,net,'test',loss_func,None,device)
 
 print('Reconstruction loss: {}'.format(recon_loss))
+
+#%%
 
 idx = 0
 
