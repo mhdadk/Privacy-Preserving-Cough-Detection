@@ -114,7 +114,7 @@ class Autoencoder(torch.nn.Module):
                                  kernel_size = 3,
                                  stride = 1,
                                  bias = True),
-                 torch.nn.Softplus()]
+                 torch.nn.Softplus(beta = 0.5)]
         
         decoder.extend(layer)
         
