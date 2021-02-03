@@ -12,15 +12,25 @@ def run_batch(x,spec,net,mode,loss_func,optimizer,device):
     
     x = x.to(device)
     
+    x = spec(x)
+    
+    x = torchaudio.functional.magphase(x)[0]
+    
+    scale_factor = x.amax(dim=(2,3))[(..., ) + (None, ) * 2]
+    
+    # scale each example in a batch to interval [0,1]
+    
+    x = x / scale_factor
+    
     with torch.set_grad_enabled(mode == 'train'):
-        
-        x = spec(x)
-        
-        x = torchaudio.functional.magphase(x)[0]
         
         # compute reconstruction of input signal
         
         x_hat = net(x)
+        
+        # re-scale back to normal values
+        
+        x_hat = x_hat * scale_factor
         
         # compute reconstruction loss
         
