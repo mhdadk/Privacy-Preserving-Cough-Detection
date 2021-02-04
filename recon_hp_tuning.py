@@ -219,7 +219,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 # number of epochs for each trial
 
-num_epochs = 10
+num_epochs = 5
 
 # for dataloaders
 
@@ -257,7 +257,7 @@ study = optuna.create_study(study_name = 'recon_hp_tuning',
 if __name__ == '__main__':
     
     study.optimize(objective,
-                   n_trials = 200,
+                   n_trials = 50,
                    n_jobs = 5,
                    gc_after_trial = True)
     
