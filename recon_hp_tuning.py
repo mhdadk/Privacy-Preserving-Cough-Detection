@@ -258,7 +258,7 @@ if __name__ == '__main__':
     
     study.optimize(objective,
                    n_trials = 200,
-                   n_jobs = 5,
+                   n_jobs = 2,
                    gc_after_trial = True)
     
     pickle.dump(study,open('results/study.pkl','wb'))
