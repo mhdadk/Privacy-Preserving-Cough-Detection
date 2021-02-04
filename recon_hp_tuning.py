@@ -109,8 +109,7 @@ def objective(trial):
     
     inst_norm = trial.suggest_categorical('inst_norm',[True,False])
     num_channels = trial.suggest_categorical('num_channels',
-                                             [8,16,32,64,128,256,512,
-                                              1024])
+                                             [8,16,32,64,128,256])
     net = Autoencoder(inst_norm = inst_norm,
                       num_channels = num_channels).to(device)
     
