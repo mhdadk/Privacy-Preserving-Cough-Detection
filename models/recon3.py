@@ -32,25 +32,27 @@ class PTanh(torch.nn.Module):
 
 class Autoencoder(torch.nn.Module):
     
-    def __init__(self):
+    def __init__(self,inst_norm = True, num_channels = 16):
         
         super().__init__()
         
+        self.inst_norm = inst_norm
+        
         self.encoder = torch.nn.Conv2d(in_channels = 1,
-                                       out_channels = 8,
+                                       out_channels = num_channels,
                                        kernel_size = 3,
                                        stride = 1,
                                        padding = 1,
                                        padding_mode = 'replicate',
                                        bias = True)
         
-        self.normalization = torch.nn.InstanceNorm2d(num_features = 8,
+        self.normalization = torch.nn.InstanceNorm2d(num_features = num_channels,
                                                      eps = 1e-8,
                                                      momentum = 0.1,
                                                      affine = True,
                                                      track_running_stats = True)
         
-        self.decoder = torch.nn.Conv2d(in_channels = 8,
+        self.decoder = torch.nn.Conv2d(in_channels = num_channels,
                                        out_channels = 1,
                                        kernel_size = 3,
                                        stride = 1,
@@ -62,6 +64,8 @@ class Autoencoder(torch.nn.Module):
         
     def forward(self,x):
         x = self.encoder(x)
+        if self.inst_norm:
+            x = self.normalization(x)
         x = self.decoder(x)
         x = self.activation(x)
         return x
