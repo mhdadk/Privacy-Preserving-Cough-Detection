@@ -152,7 +152,7 @@ def objective(trial):
     # initialize dataloaders
     
     batch_size = trial.suggest_categorical('batch_size',
-                                            [4,8,16,32,64,128])
+                                            [4,8,16,32,64])
     
     for mode in ['train','val']:
         
@@ -258,7 +258,7 @@ if __name__ == '__main__':
     
     study.optimize(objective,
                    n_trials = 200,
-                   n_jobs = 2,
+                   n_jobs = 5,
                    gc_after_trial = True)
     
     pickle.dump(study,open('results/study.pkl','wb'))
