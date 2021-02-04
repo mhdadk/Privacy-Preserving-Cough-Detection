@@ -2,7 +2,6 @@ import torch
 import torchaudio
 import optuna
 import pickle
-import pprint
 
 from models.recon3 import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
@@ -169,12 +168,6 @@ def objective(trial):
     loss_func_alpha = trial.suggest_discrete_uniform('loss_func_alpha',
                                                      1,10,1)
     
-    # display trial parameters
-    
-    print('Currently trying:')
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(trial.params)
-    
     for epoch in range(num_epochs):
         
         print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
@@ -265,6 +258,6 @@ if __name__ == '__main__':
     
     study.optimize(objective,
                    n_trials = 200,
-                   n_jobs = -1)
+                   n_jobs = 4)
     
     pickle.dump(study,open('results/study.pkl','wb'))
