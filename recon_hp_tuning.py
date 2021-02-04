@@ -257,7 +257,7 @@ if __name__ == '__main__':
     
     study.optimize(objective,
                    n_trials = 50,
-                   n_jobs = 5,
+                   n_jobs = 4,
                    gc_after_trial = True)
     
     pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
