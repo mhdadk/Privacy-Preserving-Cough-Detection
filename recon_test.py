@@ -3,7 +3,7 @@ import torchaudio
 import librosa.display
 # from collections import OrderedDict
 
-from models.recon2 import Autoencoder
+from models.recon3 import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
 
 import matplotlib.pyplot as plt
@@ -79,7 +79,7 @@ sample_rate = 16000
 
 # initialize reconstruction network
 
-net = Autoencoder(batch_norm = True).to(device)
+net = Autoencoder(num_channels = 8).to(device)
 pt_filename = '1-5s_5epochs.pt'
 param_path = 'parameters/recon/' + pt_filename
 net.load_state_dict(torch.load(param_path,map_location = device))
@@ -119,7 +119,7 @@ dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'train',
 dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
 dataloader = torch.utils.data.DataLoader(dataset = dataset,
-                                         batch_size = 8,
+                                         batch_size = 64,
                                          shuffle = False,
                                          **dl_config)
 
@@ -139,7 +139,7 @@ def loss_func(x_hat,x,alpha = 1):
     log_loss = torch.linalg.norm(torch.log(x + eps) - torch.log(x_hat + eps),
                                  ord = 1, dim = (2,3)).squeeze()
     
-    return torch.mean(spec_conv + alpha * log_loss)
+    return torch.sum(spec_conv + alpha * log_loss)
 
 # loss_func = torch.nn.SmoothL1Loss(reduction = 'mean',
 #                                   beta = 1.0)
