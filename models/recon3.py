@@ -36,73 +36,34 @@ class Autoencoder(torch.nn.Module):
         
         super().__init__()
         
-        # encoder --------------------------------------------------------
-        
-        encoder = []
-        
-        # fully-connected along frequency axis and convolutional along
-        # time axis
-        
-        first_layer = [torch.nn.Conv2d(in_channels = 1,
-                                       out_channels = 32,
-                                       kernel_size = (154,3),
-                                       stride = 1,
-                                       bias = False),
-                       PTanh(32)]
-        
-        encoder.extend(first_layer)
-        
-        second_layer = [torch.nn.Conv1d(in_channels = 32,
-                                        out_channels = 64,
-                                        kernel_size = 3,
-                                        stride = 1,
-                                        bias = False),
-                       PTanh(64),
-                       torch.nn.Conv1d(in_channels = 64,
-                                       out_channels = 64,
-                                       kernel_size = 2,
-                                       stride = 2,
-                                       bias = False)]
-        
-        encoder.extend(second_layer)
-        
-        self.encoder = torch.nn.Sequential(*encoder)
-        
-        # decoder --------------------------------------------------------
-        
-        decoder = []
-        
-        third_layer = [torch.nn.Upsample(size = 2000,
-                                         mode = 'nearest'),
-                       torch.nn.Conv1d(in_channels = 64,
-                                       out_channels = 32,
+        self.encoder = torch.nn.Conv2d(in_channels = 1,
+                                       out_channels = 8,
                                        kernel_size = 3,
                                        stride = 1,
-                                       bias = False),
-                       PTanh(32)]
+                                       padding = 1,
+                                       padding_mode = 'replicate',
+                                       bias = True)
         
-        decoder.extend(third_layer)
+        self.normalization = torch.nn.InstanceNorm2d(num_features = 8,
+                                                     eps = 1e-8,
+                                                     momentum = 0.1,
+                                                     affine = True,
+                                                     track_running_stats = True)
         
-        fourth_layer = [torch.nn.Upsample(size = 14000,
-                                          mode = 'nearest'),
-                        torch.nn.Conv1d(in_channels = 32,
-                                        out_channels = 1,
-                                        kernel_size = 3,
-                                        stride = 1,
-                                        bias = False),
-                        PTanh(1)]
+        self.decoder = torch.nn.Conv2d(in_channels = 8,
+                                       out_channels = 1,
+                                       kernel_size = 3,
+                                       stride = 1,
+                                       padding = 1,
+                                       padding_mode = 'replicate',
+                                       bias = True)
         
-        decoder.extend(fourth_layer)
-        
-        # flatten to same shape as input 1D signal
-        
-        # decoder.append(torch.nn.Flatten(start_dim = 2))
-        
-        self.decoder = torch.nn.Sequential(*decoder)
+        self.activation = torch.nn.Sigmoid()
         
     def forward(self,x):
         x = self.encoder(x)
         x = self.decoder(x)
+        x = self.activation(x)
         return x
 
 if __name__ == '__main__':
@@ -114,29 +75,44 @@ if __name__ == '__main__':
     
     batch_size = 8
     num_channels = 1
+    sr = 16000
     length_sec = 1.5
-    sample_rate = 16000
-    
-    x = torch.rand(batch_size,num_channels,int(length_sec * sample_rate))
+    x = torch.rand(batch_size,num_channels,int(length_sec * sr))
     
     print('Input shape: {}'.format(tuple(x.shape)))
     
-    spec = torchaudio.transforms.Spectrogram(n_fft = 306,
-                                             hop_length = 8,
+    win_length_sec = 0.012
+    win_length = int(sr * win_length_sec)
+    # need 50% overlap to satisfy constant-overlap-add constraint to allow
+    # for perfect reconstruction using inverse STFT
+    hop_length = int(sr * win_length_sec / 2)
+    
+    spec = torchaudio.transforms.Spectrogram(n_fft = 512,
+                                             win_length = win_length,
+                                             hop_length = hop_length,
                                              pad = 0,
-                                             normalized = True)
+                                             window_fn = torch.hann_window,
+                                             power = None,
+                                             normalized = False,
+                                             wkwargs = None)
     x = spec(x)
     
-    print('Log Mel-scale spectrogram shape: {}'.format(tuple(x.shape)))
+    print('Spectrogram shape: {}'.format(tuple(x.shape)))
     
-    # zero mean and unit variance. The expression [(..., ) + (None, ) * 2] is
-    # used to unsqueeze 2 dimensions at the end of x.mean(dim = (2,3))
+    x,phase = torchaudio.functional.magphase(x)
     
-    x = torch.div(x - x.mean(dim = (2,3))[(..., ) + (None, ) * 2],
-                  x.std(dim = (2,3))[(..., ) + (None, ) * 2])
-    print('Normalized shape: {}'.format(tuple(x.shape)))
-    print('Normalized mean: {}'.format(x.mean()))
-    print('Normalized variance: {}'.format(x.var()))
+    x = x / x.amax(dim=(2,3))[(..., ) + (None, ) * 2]
+    
+    # y = net(x)
+    
+    # # zero mean and unit variance. The expression [(..., ) + (None, ) * 2] is
+    # # used to unsqueeze 2 dimensions at the end of x.mean(dim = (2,3))
+    
+    # x = torch.div(x - x.mean(dim = (2,3))[(..., ) + (None, ) * 2],
+    #               x.std(dim = (2,3))[(..., ) + (None, ) * 2])
+    # print('Normalized shape: {}'.format(tuple(x.shape)))
+    # print('Normalized mean: {}'.format(x.mean()))
+    # print('Normalized variance: {}'.format(x.var()))
     
     """
     scale each signal to be between 0 and 1. This is equivalent to:
