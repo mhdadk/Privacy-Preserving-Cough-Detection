@@ -152,7 +152,7 @@ def objective(trial):
     # initialize dataloaders
     
     batch_size = trial.suggest_categorical('batch_size',
-                                            [4,8,16,32,64])
+                                            [4,8,16,32])
     
     for mode in ['train','val']:
         
