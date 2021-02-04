@@ -3,7 +3,7 @@ import torchaudio
 import time
 import csv
 
-from models.recon2 import Autoencoder
+from models.recon3 import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
 
 def run_batch(x,spec,net,mode,loss_func,optimizer,device):
@@ -99,11 +99,11 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 # initialize reconstruction network
 
-net = Autoencoder(batch_norm = True).to(device)
+net = Autoencoder().to(device)
 
 # number of epochs to train and validate for
 
-num_epochs = 70
+num_epochs = 5
 
 # initialize datasets and dataloaders
 
