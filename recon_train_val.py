@@ -143,7 +143,7 @@ for mode,batch_size in [('train',train_batch_size),
 # initialize loss function (negative log-likelihood function for
 # Bernoulli distribution)
 
-loss_func = torch.nn.SmoothL1Loss(reduction = 'mean',
+loss_func = torch.nn.SmoothL1Loss(reduction = 'sum',
                                   beta = 1.0)
 csv_writer.writerow(['Loss function',loss_func.__repr__()])
 csv_writer.writerow(['Loss function beta',loss_func.beta])
