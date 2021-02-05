@@ -6,7 +6,7 @@ import pickle
 from models.recon3 import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
 
-def run_batch(x,spec,net,mode,loss_func,alpha,optimizer,device):
+def run_batch(x,spec,net,mode,loss_func,optimizer,device):
     
     # move to GPU if available
     
@@ -34,7 +34,7 @@ def run_batch(x,spec,net,mode,loss_func,alpha,optimizer,device):
         
         # compute reconstruction loss
         
-        recon_loss = loss_func(x_hat,x,alpha)
+        recon_loss = loss_func(x_hat,x)
         
         if mode == 'train':
         
@@ -53,8 +53,7 @@ def run_batch(x,spec,net,mode,loss_func,alpha,optimizer,device):
     
     return recon_loss.item()
 
-def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,loss_func_alpha,
-              device):
+def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,device):
     
     if mode == 'train':
         # print('Training...')
@@ -76,8 +75,7 @@ def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,loss_func_alpha,
         
         # train or validate over the batch
         
-        recon_loss = run_batch(x,spec,net,mode,loss_func,loss_func_alpha,
-                               optimizer,device)
+        recon_loss = run_batch(x,spec,net,mode,loss_func,optimizer,device)
         
         # record running statistics
         
@@ -115,8 +113,8 @@ def objective(trial):
     
     # initialize optimizer
     
-    optimizer_name = trial.suggest_categorical('optimizer',
-                                               ['Adam','RMSprop'])
+    optimizer_name = 'Adam'#trial.suggest_categorical('optimizer',
+                                               #['Adam','RMSprop'])
     optimizer_func = getattr(torch.optim,optimizer_name)
     
     lr = trial.suggest_float('lr',1e-5,1e-2,log=True)
@@ -164,9 +162,6 @@ def objective(trial):
                                    shuffle = True,
                                    **dl_config)
     
-    loss_func_alpha = trial.suggest_discrete_uniform('loss_func_alpha',
-                                                     1,10,1)
-    
     for epoch in range(num_epochs):
         
         print('\nEpoch {}/{}'.format(epoch+1, num_epochs))
@@ -179,7 +174,6 @@ def objective(trial):
                                dataloaders['train'],
                                optimizer,
                                loss_func,
-                               loss_func_alpha,
                                device)
         
         print('\nAverage Training loss: {:.4f}'.format(train_loss))
@@ -192,7 +186,6 @@ def objective(trial):
                              dataloaders['val'],
                              optimizer,
                              loss_func,
-                             loss_func_alpha,
                              device)
         
         print('\nAverage Validation Loss: {:.4f}'.format(val_loss))
@@ -246,17 +239,20 @@ spec = torchaudio.transforms.Spectrogram(n_fft = 512,
 
 # tune hp using optuna
 
-pruner = optuna.pruners.HyperbandPruner(max_resource = num_epochs)
+# cant use pruner with multivariate TPE. See
+# https://github.com/optuna/optuna/issues/2316
+# for details
+
+# pruner = optuna.pruners.HyperbandPruner(max_resource = num_epochs)
 sampler = optuna.samplers.TPESampler(seed = 42,
                                      multivariate = True)
 study = optuna.create_study(study_name = 'recon_hp_tuning',
                             direction = 'minimize',
-                            pruner = pruner,
                             sampler = sampler)
 if __name__ == '__main__':
     
     study.optimize(objective,
-                   n_trials = 50,
+                   n_trials = 100,
                    n_jobs = 1,
                    gc_after_trial = True)
     
