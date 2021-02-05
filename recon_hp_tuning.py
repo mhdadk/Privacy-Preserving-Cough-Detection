@@ -71,8 +71,8 @@ def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,loss_func_alpha,
         
         # track progress
         
-        print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
-              end='',flush=True)
+        # print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
+        #       end='',flush=True)
         
         # train or validate over the batch
         
@@ -107,19 +107,19 @@ def objective(trial):
     
     # initialize network
     
-    inst_norm = trial.suggest_categorical('inst_norm',[True,False])
+    inst_norm = False #trial.suggest_categorical('inst_norm',[True,False])
     num_channels = trial.suggest_categorical('num_channels',
-                                             [8,16,32,64,128,256])
+                                             [8,16,32,64])
     net = Autoencoder(inst_norm = inst_norm,
                       num_channels = num_channels).to(device)
     
     # initialize optimizer
     
     optimizer_name = trial.suggest_categorical('optimizer',
-                                               ['Adam','RMSprop','SGD'])
+                                               ['Adam','RMSprop'])
     optimizer_func = getattr(torch.optim,optimizer_name)
     
-    lr = trial.suggest_float('lr',1e-5,1e-1,log=True)
+    lr = trial.suggest_float('lr',1e-5,1e-2,log=True)
     momentum = trial.suggest_float('momentum',0.5,0.999)
     
     if optimizer_name == 'Adam':
@@ -151,7 +151,7 @@ def objective(trial):
     # initialize dataloaders
     
     batch_size = trial.suggest_categorical('batch_size',
-                                            [4,8,16,32])
+                                            [8,16,32,64])
     
     for mode in ['train','val']:
         
@@ -257,7 +257,7 @@ if __name__ == '__main__':
     
     study.optimize(objective,
                    n_trials = 50,
-                   n_jobs = 2,
+                   n_jobs = 1,
                    gc_after_trial = True)
     
     pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
