@@ -192,8 +192,8 @@ def objective(trial):
         
         trial.report(val_loss,epoch)
         
-        if trial.should_prune():
-            raise optuna.TrialPruned()
+        #if trial.should_prune():
+        #    raise optuna.TrialPruned()
     
     return val_loss
 
