@@ -253,8 +253,8 @@ if __name__ == '__main__':
     
     study.optimize(objective,
                    n_trials = 100,
-                   n_jobs = 1,
-                   gc_after_trial = True)
+                   n_jobs = 0,
+                   gc_after_trial = False)
     
     pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
     complete_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
