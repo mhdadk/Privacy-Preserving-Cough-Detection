@@ -106,8 +106,8 @@ def objective(trial):
     # initialize network
     
     inst_norm = False #trial.suggest_categorical('inst_norm',[True,False])
-    num_channels = trial.suggest_categorical('num_channels',
-                                             [8,16,32,64])
+    num_channels = 32 #trial.suggest_categorical('num_channels',
+                                             #[8,16,32,64])
     net = Autoencoder(inst_norm = inst_norm,
                       num_channels = num_channels).to(device)
     
@@ -117,18 +117,19 @@ def objective(trial):
                                                #['Adam','RMSprop'])
     optimizer_func = getattr(torch.optim,optimizer_name)
     
-    lr = trial.suggest_float('lr',1e-5,1e-2,log=True)
-    momentum = trial.suggest_float('momentum',0.5,0.999)
+    lr = trial.suggest_float('lr',1e-5,1e-1,log=True)
+    amsgrad = trial.suggest_categorical('amsgrad',[True,False])
+    #momentum = trial.suggest_float('momentum',0.5,0.999)
     
     if optimizer_name == 'Adam':
-        beta1 = trial.suggest_float('adam_beta1',0.4,0.9)
-        beta2 = trial.suggest_float('adam_beta2',0.8,0.999)
+        #beta1 = trial.suggest_float('adam_beta1',0.4,0.9)
+        #beta2 = trial.suggest_float('adam_beta2',0.8,0.999)
         optimizer = optimizer_func(net.parameters(),
                                    lr = lr,
-                                   betas=(beta1,beta2),
+                                   #betas=(beta1,beta2),
                                    eps = 1e-08,
                                    weight_decay = 0,
-                                   amsgrad = False)
+                                   amsgrad = amsgrad)
     elif optimizer_name == 'RMSprop':
         rmsprop_alpha = trial.suggest_float('rmsprop_alpha',0.8,0.99)
         optimizer = optimizer_func(net.parameters(),
@@ -190,7 +191,7 @@ def objective(trial):
         
         print('\nAverage Validation Loss: {:.4f}'.format(val_loss))
         
-        trial.report(val_loss,epoch)
+        #trial.report(val_loss,epoch)
         
         #if trial.should_prune():
         #    raise optuna.TrialPruned()
