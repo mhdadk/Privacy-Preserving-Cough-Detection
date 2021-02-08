@@ -100,9 +100,11 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # initialize reconstruction network
 
 net = Autoencoder(inst_norm = False, num_channels = 32).to(device)
+@torch.no_grad()
 def init_params(m):
     for param in m.parameters():
-        torch.nn.init.uniform_(param,-2,2)
+        if param.ndim >= 2: # for weights only not biases
+            torch.nn.init.uniform_(param,-2,2)
 net.apply(init_params)
 
 # number of epochs to train and validate for
