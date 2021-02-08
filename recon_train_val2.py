@@ -56,10 +56,10 @@ def run_batch(x,spec,net,mode,loss_func,optimizer,device):
 def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,device):
     
     if mode == 'train':
-        print('Training...')
+        #print('Training...')
         net.train()
     else:
-        print('\nValidating...')
+        #print('\nValidating...')
         net.eval()
     
     # to compute average reconstruction loss per sample
@@ -70,8 +70,8 @@ def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,device):
         
         # track progress
         
-        print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
-              end='',flush=True)
+        #print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
+        #      end='',flush=True)
         
         # train or validate over the batch
         
@@ -99,11 +99,11 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 # initialize reconstruction network
 
-net = Autoencoder().to(device)
+net = Autoencoder(inst_norm = False, num_channels = 32).to(device)
 
 # number of epochs to train and validate for
 
-num_epochs = 5
+num_epochs = 120
 
 # initialize datasets and dataloaders
 
@@ -196,7 +196,10 @@ def loss_func(x_hat,x,alpha = 1):
 # initialize optimizer. Must put net parameters on GPU before this step
 
 optimizer = torch.optim.Adam(params = net.parameters(),
-                             lr = 0.0003)
+                             lr = 0.022756034459905584,
+                             eps = 1e-08,
+                             weight_decay = 0,
+                             amsgrad = False)
 csv_writer.writerow(['Optimizer',optimizer.__module__])
 csv_writer.writerow(['Optimizer parameters',str(optimizer.defaults)])
 
