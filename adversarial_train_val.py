@@ -6,44 +6,106 @@ import csv
 from models.recon3 import Autoencoder
 from torch_datasets.AudioDataset import AudioDataset
 
-def run_batch(x,spec,net,mode,loss_func,optimizer,device):
+def run_batch_disc(mode,x,labels,transforms,net,loss_func,device):
+    
+    log, mel, spec = transforms
+    
+    # compute logarithmic Mel-scale spectrogram of the filtered signal
+    
+    x = log(mel(spec(x))
+    
+    # with torch.set_grad_enabled(mode == 'train'):        
+    
+    # logits must have the same shape as labels
+    
+    logits = net(x).squeeze(dim = 1)
+    
+    # compute negative log-likelihood (NLL) using logits
+    
+    NLL = loss_func(logits,labels)
+    
+    # record predictions. since sigmoid(0) = 0.5, then negative values
+    # correspond to class 0 and positive values correspond to class 1
+    
+    preds = logits > 0
+    
+    # record correct predictions
+    
+    true_preds = torch.sum(preds == labels)
+    
+    return NLL,true_preds.item()
+
+def run_batch_recon(mode,x,spec,net,loss_func,device):
+    
+    # compute magnitude spectrogram of the filtered signal
+    
+    x = spec(x)
+    x = torchaudio.functional.magphase(x)[0]
+    
+    # scale each magnitude spectrogram in the batch to the interval [0,1]
+    
+    scale_factor = x.amax(dim=(2,3))[(..., ) + (None, ) * 2]
+    x_scaled = x / scale_factor
+    
+    # with torch.set_grad_enabled(mode == 'train'):
+        
+    # compute reconstruction of the scaled magnitude spectrogram
+    
+    x_hat = net(x_scaled)
+    
+    # unscale magnitude spectrogram back to normal values
+    
+    x_hat = x_hat * scale_factor
+    
+    # compute reconstruction loss
+    
+    recon_loss = loss_func(x_hat,x)
+    
+    return recon_loss
+
+def run_batch(batch,mode,transforms,lambda_adv,filt,net,loss_funcs,
+              optimizer,device):
+    
+    # unpack the batch and loss functions
+    
+    x,labels = batch
+    disc_loss_func, recon_loss_func = loss_funcs
     
     # move to GPU if available
     
     x = x.to(device)
-    
-    x = spec(x)
-    
-    x = torchaudio.functional.magphase(x)[0]
-    
-    # scale each example in the batch to interval [0,1]
-    
-    scale_factor = x.amax(dim=(2,3))[(..., ) + (None, ) * 2]
-    
-    x_scaled = x / scale_factor
+    labels = labels.to(device).type_as(x) # needed for NLL
     
     with torch.set_grad_enabled(mode == 'train'):
         
-        # compute reconstruction of input signal
+        # filter each signal
         
-        x_hat = net(x_scaled)
+        x = filt(x)
         
-        # re-scale back to normal values
+        # compute classification (negative log-likelihood (NLL)) loss and
+        # number of correct predictions
         
-        x_hat = x_hat * scale_factor
+        NLL, true_preds = run_batch_disc(mode,x,labels,transforms,disc_net,
+                                         disc_loss_func,device)
         
-        # compute reconstruction loss
+        # extract speech signals from x and compute reconstruction loss
         
-        recon_loss = loss_func(x_hat,x)
+        where_speech = torch.nonzero(labels == 0, as_tuple = True)
+        recon_loss = run_batch_recon(mode,x[where_speech],transforms[2],
+                                     recon_net,recon_loss_func,device)
+        
+        # compute adversarial loss
+        
+        adv_loss = NLL - lambda_adv * recon_loss
         
         if mode == 'train':
         
-            # compute gradients of reconstruction loss with respect to
-            # parameters
+            # compute gradient of adversarial loss with respect to filter,
+            # discriminator network, and reconstruction network parameters
             
-            recon_loss.backward()
+            adv_loss.backward()
             
-            # update parameters using these gradients
+            # update parameters using the gradient descent update rule
             
             optimizer.step()
             
@@ -51,39 +113,41 @@ def run_batch(x,spec,net,mode,loss_func,optimizer,device):
             
             optimizer.zero_grad()
     
-    return recon_loss.item()
+    return NLL.item(),true_preds.item(),recon_loss.item(),adv_loss.item()
 
-def run_epoch(mode,net,spec,dataloader,optimizer,loss_func,device):
+def run_epoch(mode,dataloader,transforms,filt,net,optimizer,loss_funcs,
+              lambda_adv,device):
     
     if mode == 'train':
-        #print('Training...')
+        print('Training...')
         net.train()
     else:
-        #print('\nValidating...')
+        print('\nValidating...')
         net.eval()
     
-    # to compute average reconstruction loss per sample
+    # to record epoch statistics
     
-    total_recon_loss = 0
+    total_stats = torch.tensor([0,0,0,0])
     
-    for i,x in enumerate(dataloader):
+    for i,batch in enumerate(dataloader):
         
         # track progress
         
-        #print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
-        #      end='',flush=True)
+        print('\rProgress: {:.2f}%'.format((i+1)/len(dataloader)*100),
+              end='',flush=True)
         
         # train or validate over the batch
         
-        recon_loss = run_batch(x,spec,net,mode,loss_func,optimizer,device)
+        stats = run_batch(batch,mode,transforms,lambda_adv,filt,net,
+                          loss_funcs,optimizer,device)
         
         # record running statistics
         
-        total_recon_loss += recon_loss
+        total_stats += torch.tensor(stats)
     
-    recon_loss_per_sample = total_recon_loss / len(dataloader.dataset)
+    mean_stats = total_stats / len(dataloader.dataset)
     
-    return recon_loss_per_sample
+    return mean_stats.tolist()
 
 # for reproducibility
 
@@ -217,6 +281,35 @@ csv_writer.writerow(['Epoch',
                      'Epoch time',
                      'Training loss',
                      'Validation loss'])
+
+# transforms
+
+log = torchaudio.transforms.AmplitudeToDB().to(device)
+
+# settings for spectrograms
+
+win_length_sec = 0.012
+win_length = int(sample_rate * win_length_sec)
+# need 50% overlap to satisfy constant-overlap-add constraint to allow
+# for perfect reconstruction using inverse STFT
+hop_length = int(sample_rate * win_length_sec / 2) # used to be 64
+n_mels = 128
+n_fft = 512 # used to be 1024
+
+mel = torchaudio.transforms.MelScale(n_mels = n_mels,
+                                     sample_rate = sample_rate,
+                                     f_min = 0.0,
+                                     f_max = None,
+                                     n_stft = n_fft)
+
+spec = torchaudio.transforms.Spectrogram(n_fft = n_fft,
+                                         win_length = win_length,
+                                         hop_length = hop_length,
+                                         pad = 0,
+                                         window_fn = torch.hann_window,
+                                         power = None,
+                                         normalized = False,
+                                         wkwargs = None).to(device)
 
 if __name__ == '__main__':
 
