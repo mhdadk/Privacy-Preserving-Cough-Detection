@@ -1,6 +1,9 @@
 import torch
 import torchaudio
+
+import librosa
 import librosa.display
+import numpy as np
 # from collections import OrderedDict
 
 from models.recon3 import Autoencoder
@@ -10,50 +13,19 @@ import matplotlib.pyplot as plt
 import sounddevice as sd
 
 def run_batch(x,spec,net,mode,loss_func,optimizer,device):
-    
-    # move to GPU if available
-    
     x = x.to(device)
-    
     x = spec(x)
-    
     x = torchaudio.functional.magphase(x)[0]
-    
-    # scale each example in the batch to interval [0,1]
-    
     scale_factor = x.amax(dim=(2,3))[(..., ) + (None, ) * 2]
-    
     x_scaled = x / scale_factor
-    
     with torch.set_grad_enabled(mode == 'train'):
-        
-        # compute reconstruction of input signal
-        
         x_hat = net(x_scaled)
-        
-        # re-scale back to normal values
-        
         x_hat = x_hat * scale_factor
-        
-        # compute reconstruction loss
-        
         recon_loss = loss_func(x_hat,x)
-        
         if mode == 'train':
-        
-            # compute gradients of reconstruction loss with respect to
-            # parameters
-            
             recon_loss.backward()
-            
-            # update parameters using these gradients
-            
             optimizer.step()
-            
-            # zero the accumulated parameter gradients
-            
             optimizer.zero_grad()
-            
     if mode == 'train':
         return recon_loss.item()
     else:
@@ -79,8 +51,8 @@ sample_rate = 16000
 
 # initialize reconstruction network
 
-net = Autoencoder(num_channels = 8).to(device)
-pt_filename = '1-5s_5epochs.pt'
+net = Autoencoder(inst_norm = False, num_channels = 32).to(device)
+pt_filename = '1-5s_120epochs_sparse.pt'
 param_path = 'parameters/recon/' + pt_filename
 net.load_state_dict(torch.load(param_path,map_location = device))
 net.eval()
@@ -100,24 +72,14 @@ net.eval()
 #         net.__getattr__(parent).__getattr__(child).register_forward_hook(
 #                                     get_output(name))
 
-# whether to use a single speech file or sample a batch of speech files
-
-# single_file = False
-
 # initialize datasets and dataloaders
 
-dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'train',
+dataset = AudioDataset(raw_data_dir,window_length,sample_rate,'test',
                        normalize = True, only_speech = True)
-
-# speech_data_dir = pathlib.Path('../datasets2/4/2_LIBRISPEECH')
-# window_length = 1.5 # seconds
-# sample_rate = 2000
-# dataset = SpeechDataset(str(speech_data_dir),window_length,sample_rate)
 
 # optimize dataloaders with GPU if available
 
 dl_config = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
-
 dataloader = torch.utils.data.DataLoader(dataset = dataset,
                                          batch_size = 64,
                                          shuffle = False,
@@ -166,7 +128,7 @@ spec = torchaudio.transforms.Spectrogram(n_fft = 512,
                                          wkwargs = None).to(device)
 
 y = spec(x)
-y = torchaudio.functional.magphase(y)[0]
+y,phase = torchaudio.functional.magphase(y)
 y_hat,recon_loss = run_batch(x,spec,net,'test',loss_func,None,device)
 
 print('Reconstruction loss: {}'.format(recon_loss))
@@ -175,15 +137,67 @@ print('Reconstruction loss: {}'.format(recon_loss))
 
 idx = 0
 
+# z = |z| cos(phase) + j |z| * sin(phase)
+
+real = torch.multiply(y_hat,torch.cos(phase))
+imag = torch.multiply(y_hat,torch.sin(phase))
+
+y_hat_complex = torch.stack((real,imag),dim = -1)
+
+x_hat = torch.istft(y_hat_complex[idx],
+                    n_fft = 512,
+                    hop_length = hop_length,
+                    win_length = win_length,
+                    window = torch.hann_window(win_length),
+                    center = True,
+                    normalized = False,
+                    onesided = None,
+                    length = None,
+                    return_complex = False)
+
 plt.subplot(2,1,1)
-plt.plot(x[idx].squeeze().detach().numpy())
+plt.title('Original')
+a = x[idx].squeeze().detach().numpy()
+plt.plot(a / a.max())
 plt.subplot(2,1,2)
-plt.plot(x_hat[idx].squeeze().detach().numpy())
+plt.title('Reconstruction')
+b = x_hat.squeeze().detach().numpy()
+plt.plot(b / b.max())
 
 #%%
 
-sd.play(x[idx].squeeze().detach().numpy(),2000)
+sd.play(x[idx].squeeze().detach().numpy(),16000)
 
 #%%
 
-sd.play(x_hat[idx].squeeze().detach().numpy(),2000)
+sd.play(x_hat.squeeze().detach().numpy(),16000)
+
+#%% display spectrograms
+
+opt = {'cmap':'viridis'}
+
+D1 = y[idx,0].detach().numpy()
+S1_db = librosa.amplitude_to_db(np.abs(D1), ref=np.max)
+fig, ax = plt.subplots()
+img = librosa.display.specshow(S1_db,
+                               sr = 16000,
+                               hop_length = hop_length,
+                               x_axis='time',
+                               y_axis='linear',
+                               ax=ax,
+                               **opt)
+ax.set(title='Original Log Spectrogram')
+fig.colorbar(img, ax=ax, format="%+2.f dB")
+
+D2 = y_hat[idx,0].detach().numpy()
+S2_db = librosa.amplitude_to_db(np.abs(D2), ref=np.max)
+fig, ax = plt.subplots()
+img = librosa.display.specshow(S2_db,
+                               sr = 16000,
+                               hop_length = hop_length,
+                               x_axis='time',
+                               y_axis='linear',
+                               ax=ax,
+                               **opt)
+ax.set(title='Reconstructed Log Spectrogram')
+fig.colorbar(img, ax=ax, format="%+2.f dB")
