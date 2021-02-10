@@ -135,7 +135,7 @@ print('Reconstruction loss: {}'.format(recon_loss))
 
 #%%
 
-idx = 0
+idx = 1
 
 # z = |z| cos(phase) + j |z| * sin(phase)
 
@@ -177,12 +177,12 @@ sd.play(x_hat.squeeze().detach().numpy(),16000)
 opt = {'cmap':'viridis'}
 
 D1 = y[idx,0].detach().numpy()
-S1_db = librosa.amplitude_to_db(np.abs(D1), ref=np.max)
+# S1_db = librosa.amplitude_to_db(np.abs(D1), ref=np.max)
 fig, ax = plt.subplots()
-img = librosa.display.specshow(S1_db,
+img = librosa.display.specshow(D1,
                                sr = 16000,
                                hop_length = hop_length,
-                               x_axis='time',
+                               x_axis='s',
                                y_axis='linear',
                                ax=ax,
                                **opt)
@@ -190,12 +190,12 @@ ax.set(title='Original Log Spectrogram')
 fig.colorbar(img, ax=ax, format="%+2.f dB")
 
 D2 = y_hat[idx,0].detach().numpy()
-S2_db = librosa.amplitude_to_db(np.abs(D2), ref=np.max)
+# S2_db = librosa.amplitude_to_db(np.abs(D2), ref=np.max)
 fig, ax = plt.subplots()
-img = librosa.display.specshow(S2_db,
+img = librosa.display.specshow(D2,
                                sr = 16000,
                                hop_length = hop_length,
-                               x_axis='time',
+                               x_axis='s',
                                y_axis='linear',
                                ax=ax,
                                **opt)
